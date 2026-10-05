@@ -1,0 +1,21 @@
+# Publicar Europa
+
+1. En Supabase → SQL Editor → New query: pegar `supabase/setup.sql` y pulsar Run. Crea una tabla de estado con revisión y un bucket privado de fotos; no elimina datos.
+2. Importar este repositorio en Vercel. Framework: Other. Root Directory: raíz del repositorio. Output Directory: public. Sin comando de build. Las funciones están en api/ y Vercel las despliega automáticamente.
+3. En Environment Variables de Vercel agregar:
+   - SUPABASE_URL: URL del proyecto de Supabase.
+   - SUPABASE_SECRET_KEY: clave secreta de Supabase (sb_secret_… o legacy service_role). Nunca ponerla en archivos públicos ni GitHub.
+   - EUROPA_ACCESS_TOKEN: secreto aleatorio de al menos 32 caracteres. Para generarlo localmente: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+4. Deploy. Si las variables se agregan después, hacer Redeploy.
+5. Abrir y compartir solamente con el grupo `https://TU-DOMINIO.vercel.app/#acceso=TU_EUROPA_ACCESS_TOKEN`. El fragmento se elimina de la barra y se conserva en la sesión del navegador. Una pestaña nueva puede requerir abrir el enlace otra vez. Para revocarlo cambiar el token y redesplegar.
+6. Crear un repertorio desde un dispositivo y recargar desde otro. Probar también una foto y un aporte. Si dos dispositivos editan una misma versión, solo se acepta el primero: el segundo debe cerrar el formulario, recargar y repetir su edición.
+
+## Datos y alcance
+
+No hay cuentas ni pantalla de login. Cualquiera con el enlace privado tiene permisos de lectura y edición. No es posible identificar qué integrante hizo cada cambio.
+
+La versión local sigue usando los datos anteriores en el navegador. No se copian automáticamente a Supabase. No borrar ese almacenamiento si se desea migrarlo después. La versión publicada empieza vacía.
+
+La estructura actual se conserva dentro de una columna JSONB, con actualización atómica condicionada a la revisión. Esto evita una migración destructiva de la demo y puede separarse en tablas por entidad más adelante. Las fotos nuevas se comprimen en el navegador y se guardan en Storage privado, nunca en GitHub. Las fotos reemplazadas se conservan por ahora; su limpieza deberá hacerse posteriormente sin eliminar fotos en uso.
+
+Los datos compartidos requieren conexión. No se realiza guardado local silencioso si el servidor falla. Se ven los cambios ajenos al recargar. No hay sincronización en vivo todavía.
