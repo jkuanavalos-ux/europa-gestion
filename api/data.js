@@ -3,10 +3,16 @@ const hash=s=>createHash('sha256').update(s).digest();
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  const reply=(code,message)=>res.status(code).json({error:message});
- const {SUPABASE_URL:url,SUPABASE_SECRET_KEY:key,EUROPA_ACCESS_TOKEN:token}=process.env;
- if(!url||!key||!token||token.length<32)return reply(503,'Falta configurar Supabase o el acceso privado en Vercel.');
- const supplied=(req.headers.authorization||'').replace(/^Bearer /,'');
- if(!timingSafeEqual(hash(supplied),hash(token)))return reply(401,'Abrí el enlace privado compartido con la banda.');
+ const {SUPABASE_URL:url,SUPABASE_SECRET_KEY:key,EUROPA_ACCESS_TOKEN:token,EUROPA_PRIVATE:priv}=process.env;
+ // Acceso abierto: cualquiera con el link de Vercel puede leer y editar.
+ // Para volver a exigir una clave: EUROPA_PRIVATE=true y EUROPA_ACCESS_TOKEN (32+ caracteres) en Vercel.
+ const requireToken=priv==='true';
+ if(!url||!key)return reply(503,'Falta configurar Supabase en Vercel (SUPABASE_URL y SUPABASE_SECRET_KEY).');
+ if(requireToken){
+  if(!token||token.length<32)return reply(503,'Falta EUROPA_ACCESS_TOKEN (32 caracteres o más) en Vercel.');
+  const supplied=(req.headers.authorization||'').replace(/^Bearer /,'');
+  if(!timingSafeEqual(hash(supplied),hash(token)))return reply(401,'Abrí el enlace privado compartido con la banda.');
+ }
  const headers={apikey:key,'Content-Type':'application/json'};
  if(!key.startsWith('sb_secret_'))headers.Authorization=`Bearer ${key}`;
  const remote=async(path,opts={})=>{const r=await fetch(url+path,{...opts,headers:{...headers,...opts.headers}});if(!r.ok)throw Error('Supabase');return r};

@@ -7,12 +7,12 @@
    - SUPABASE_SECRET_KEY: clave secreta de Supabase (sb_secret_… o legacy service_role). Nunca ponerla en archivos públicos ni GitHub.
    - EUROPA_ACCESS_TOKEN: secreto aleatorio de al menos 32 caracteres. Para generarlo localmente: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 4. Deploy. Si las variables se agregan después, hacer Redeploy.
-5. Abrir y compartir solamente con el grupo `https://TU-DOMINIO.vercel.app/#acceso=TU_EUROPA_ACCESS_TOKEN`. El fragmento se elimina de la barra y se conserva en la sesión del navegador. Una pestaña nueva puede requerir abrir el enlace otra vez. Para revocarlo cambiar el token y redesplegar.
+5. Abrir y compartir `https://TU-DOMINIO.vercel.app`: cualquiera que tenga ese enlace entra directo y puede ver y editar. Con el modo privado (EUROPA_PRIVATE=true) el enlace es `https://TU-DOMINIO.vercel.app/#acceso=TU_EUROPA_ACCESS_TOKEN`; para revocarlo se cambia el token y se redespliega.
 6. Crear un repertorio desde un dispositivo y recargar desde otro. Probar también una foto y un aporte. Si dos dispositivos editan una misma versión, solo se acepta el primero: el segundo debe cerrar el formulario, recargar y repetir su edición.
 
 ## Datos y alcance
 
-No hay cuentas ni pantalla de login. Cualquiera con el enlace privado tiene permisos de lectura y edición. No es posible identificar qué integrante hizo cada cambio.
+No hay cuentas ni pantalla de login. Cualquiera con el enlace de la app tiene permisos de lectura y edición (y puede borrar datos). Si el enlace se comparte fuera del grupo, activá el modo privado. No es posible identificar qué integrante hizo cada cambio.
 
 La versión local sigue usando los datos anteriores en el navegador. No se copian automáticamente a Supabase. No borrar ese almacenamiento si se desea migrarlo después. La versión publicada empieza vacía.
 
