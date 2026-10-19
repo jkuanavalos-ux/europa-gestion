@@ -5,7 +5,7 @@
 3. En Environment Variables de Vercel agregar:
    - SUPABASE_URL: URL del proyecto de Supabase.
    - SUPABASE_SECRET_KEY: clave secreta de Supabase (sb_secret_… o legacy service_role). Nunca ponerla en archivos públicos ni GitHub.
-   - EUROPA_ACCESS_TOKEN: secreto aleatorio de al menos 32 caracteres. Para generarlo localmente: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+   - (Opcional, solo para acceso privado) EUROPA_PRIVATE=true y EUROPA_ACCESS_TOKEN: secreto aleatorio de al menos 32 caracteres. No hace falta para que el link de Vercel entre directo. Para generarlo localmente: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 4. Deploy. Si las variables se agregan después, hacer Redeploy.
 5. Abrir y compartir `https://TU-DOMINIO.vercel.app`: cualquiera que tenga ese enlace entra directo y puede ver y editar. Con el modo privado (EUROPA_PRIVATE=true) el enlace es `https://TU-DOMINIO.vercel.app/#acceso=TU_EUROPA_ACCESS_TOKEN`; para revocarlo se cambia el token y se redespliega.
 6. Crear un repertorio desde un dispositivo y recargar desde otro. Probar también una foto y un aporte. Si dos dispositivos editan una misma versión, solo se acepta el primero: el segundo debe cerrar el formulario, recargar y repetir su edición.
