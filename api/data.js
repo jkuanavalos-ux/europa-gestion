@@ -3,7 +3,10 @@ const hash=s=>createHash('sha256').update(s).digest();
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  const reply=(code,message)=>res.status(code).json({error:message});
- const {SUPABASE_URL:url,SUPABASE_SECRET_KEY:key,EUROPA_ACCESS_TOKEN:token,EUROPA_PRIVATE:priv}=process.env;
+ const {SUPABASE_URL:rawUrl,SUPABASE_SECRET_KEY:rawKey,EUROPA_ACCESS_TOKEN:token,EUROPA_PRIVATE:priv}=process.env;
+ // Se limpian espacios, saltos de línea y barras sobrantes que quedan al copiar y pegar en Vercel.
+ const url=(rawUrl||'').trim().replace(/\/+$/,'').replace(/\/(rest|storage)\/v1$/,'');
+ const key=(rawKey||'').trim();
  // Acceso abierto: cualquiera con el link de Vercel puede leer y editar.
  // Para volver a exigir una clave: EUROPA_PRIVATE=true y EUROPA_ACCESS_TOKEN (32+ caracteres) en Vercel.
  const requireToken=priv==='true';
@@ -15,7 +18,7 @@ export default async function handler(req,res){
  }
  const headers={apikey:key,'Content-Type':'application/json'};
  if(!key.startsWith('sb_secret_'))headers.Authorization=`Bearer ${key}`;
- const remote=async(path,opts={})=>{const r=await fetch(url+path,{...opts,headers:{...headers,...opts.headers}});if(!r.ok)throw Error('Supabase');return r};
+ const remote=async(path,opts={})=>{const r=await fetch(url+path,{...opts,headers:{...headers,...opts.headers}});if(!r.ok){let m='';try{const j=JSON.parse(await r.text());m=j.message||j.msg||j.error||''}catch{}throw Object.assign(Error('Supabase'),{status:r.status,detail:String(m).slice(0,140)})}return r};
  try{
   if(req.method==='GET'){
    if(req.query.photo){const name=String(req.query.photo);if(!/^[a-f0-9-]+\.jpg$/.test(name))return reply(400,'Foto inválida');const r=await remote('/storage/v1/object/europa-photos/'+name);res.setHeader('Content-Type','image/jpeg');return res.status(200).send(Buffer.from(await r.arrayBuffer()))}
@@ -36,5 +39,9 @@ export default async function handler(req,res){
   const rows=await (await remote(`/rest/v1/europa_state?id=eq.1&revision=eq.${body.revision}`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({data,revision:body.revision+1,updated_at:new Date().toISOString()})})).json();
   if(!rows.length)return reply(409,'Otra persona guardó cambios. Cerrá este formulario y recargá la página antes de volver a editar.');
   return res.status(200).json({data:rows[0].data,revision:rows[0].revision});
- }catch{return reply(502,'No se pudo guardar o leer en Supabase. Verificá la conexión y la configuración; tus cambios no se confirmaron.')}
+ }catch(e){
+  console.error('Supabase',e.status,e.detail,e.cause?.code||e.message);
+  const why=e.status?`HTTP ${e.status}${e.detail?`: ${e.detail}`:''}`:String(e.cause?.code||e.message||'sin conexión').slice(0,60);
+  return reply(502,`No se pudo guardar o leer en Supabase (${why}). Verificá la conexión y la configuración; tus cambios no se confirmaron.`)
+ }
 }
