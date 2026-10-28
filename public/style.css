@@ -2,6 +2,28 @@
 
 .brand img{display:block;width:190px;height:auto}.entry-photo{display:block;width:100%;height:190px;object-fit:contain;background:#f2eee6;border-radius:9px;margin-bottom:18px}dialog .entry-photo{height:220px}.check{display:flex;align-items:center;gap:8px}.check input{width:auto}.card{overflow-wrap:anywhere}.card .notes{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}button:disabled{opacity:.5;cursor:wait}@media(max-width:700px){.brand img{width:135px}.entry-photo{height:210px}}
 
+
+/* Casillas "ya lo aprendí" en los repertorios */
+.row.songitem{align-items:flex-start}.songmain{min-width:0}
+.songhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.badge{font-size:12px;font-weight:bold;color:#665334;background:#eae3d5;border-radius:999px;padding:4px 10px;white-space:nowrap}
+.badge.complete{background:#2f6b45;color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.chip{border-radius:999px;padding:9px 14px;min-height:40px;font-size:14px;background:#fff;border:1px solid #cfc9bb;color:#5d5a50}
+.chip[aria-pressed=true]{background:#2f6b45;border-color:#2f6b45;color:#fff}
+.chip[aria-pressed=true]:hover{background:#3b7d54}
+.linkbtn{border:0;background:none;padding:8px 4px;min-height:40px;color:#7a6743;font-size:13px;text-decoration:underline}
+.linkbtn:hover{background:none;color:#282820}
+.learned{background:#f6f3ec;border-radius:12px;padding:18px 20px;margin-bottom:8px}
+.learnedtop{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.bar{height:8px;background:#e4dfd3;border-radius:99px;overflow:hidden;margin:12px 0}
+.bar>div{height:100%;background:#2f6b45;border-radius:99px;transition:width .2s}
+.byinstrument{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:#6c6859}
+.repmeta{display:block;font-size:13px;font-weight:normal;color:#8a8578;margin-top:6px}
+.paste{margin:18px 0;border:1px dashed #d6cebe;border-radius:10px;padding:10px 14px}
+.paste summary{cursor:pointer;font-weight:bold;font-size:14px;padding:6px 0}
+.paste textarea{margin:10px 0}
+
 /* Recursos */
 .resource .url{display:block;margin:-6px 0 18px;color:#8a8578}
 .resactions{display:flex;gap:8px;flex-wrap:wrap}
