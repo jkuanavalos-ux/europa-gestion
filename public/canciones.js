@@ -14,15 +14,19 @@ export const cleanPartName = value => String(value ?? '').replace(/\s+/g, ' ').t
 export const defaultParts = () => DEFAULT_PARTS.map(name => ({ name, done: false }));
 export const partsOf = song => (Array.isArray(song?.parts) ? song.parts : defaultParts());
 
-// Misma canción = mismo título y mismo artista; si a una de las dos le falta el artista,
-// alcanza con el título (siempre que sea una única candidata).
+// Artistas compatibles: iguales, o falta uno, o uno contiene al otro ("Bersuit" y "Bersuit Vergarabat").
+const artistsMatch = (a, b) => {
+  const x = normalize(a), y = normalize(b);
+  return !x || !y || x === y || (x.length >= 4 && y.includes(x)) || (y.length >= 4 && x.includes(y));
+};
+
+// Misma canción = mismo título y artista compatible (siempre que sea una única candidata).
 export function findSong(songs, title, artist, excludeId) {
   const pool = songs.filter(song => song.id !== excludeId);
   const exact = pool.find(song => songKey(song.title, song.artist) === songKey(title, artist));
   if (exact) return exact;
-  const sameTitle = pool.filter(song =>
-    normalize(song.title) === normalize(title) && (!normalize(song.artist) || !normalize(artist)));
-  return sameTitle.length === 1 ? sameTitle[0] : null;
+  const candidates = pool.filter(song => normalize(song.title) === normalize(title) && artistsMatch(song.artist, artist));
+  return candidates.length === 1 ? candidates[0] : null;
 }
 
 // Marca o desmarca una parte. Devuelve false si la canción no tiene esa parte.

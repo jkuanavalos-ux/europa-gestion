@@ -57,3 +57,12 @@ test('avance por canción y por repertorio, con desglose por instrumento', () =>
   assert.deepEqual(rep.byPart.find(p => p.name === 'Voz'), { name: 'Voz', done: 2, total: 2 });
   assert.deepEqual(repertoireProgress([]), { done: 0, total: 0, percent: 0, byPart: [] });
 });
+
+test('un artista escrito de forma más completa sigue siendo la misma canción; dos versiones distintas, no', () => {
+  const songs = [{ id: '1', title: 'El tiempo no para', artist: 'Bersuit' }, { id: '2', title: 'Mi enfermedad', artist: 'Los Rodríguez' }];
+  assert.equal(findSong(songs, 'El tiempo no para', 'Bersuit Vergarabat').id, '1');
+  assert.equal(findSong(songs, 'mi enfermedad', 'Los Rodriguez').id, '2');
+  const covers = [{ id: '1', title: 'Zafar', artist: 'La Vela Puerca' }, { id: '2', title: 'Zafar', artist: 'Otro Grupo' }];
+  assert.equal(findSong(covers, 'Zafar', ''), null);          // ambigua: no se adivina
+  assert.equal(findSong(covers, 'Zafar', 'la vela puerca').id, '1');
+});

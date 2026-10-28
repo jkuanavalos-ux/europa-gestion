@@ -26,7 +26,7 @@ function readPart(line) {
   return name && name.length <= MAX_PART_NAME ? { name, done } : null;
 }
 
-export function parseLista(text) {
+function parseConMarcas(text) {
   const result = { title: '', songs: [], warnings: [] };
   let current = null;
   for (const raw of String(text ?? '').replace(/\r/g, '').split('\n')) {
@@ -54,4 +54,27 @@ export function parseLista(text) {
   // Una canción sin instrumentos en la lista usa los instrumentos por defecto.
   result.songs.forEach(song => { if (!song.parts.length) song.parts = null; });
   return result;
+}
+
+// Formato simple: una canción por línea, "Título – Artista" (con o sin número o viñeta).
+function parseSimple(text) {
+  const result = { title: '', songs: [], warnings: [] };
+  for (const raw of String(text ?? '').replace(/\r/g, '').split('\n')) {
+    let line = raw.trim();
+    if (!line) continue;
+    const title = line.match(TITLE);
+    if (title && !result.title && !result.songs.length) { result.title = strip(title[1]); continue; } // *TÍTULO*
+    line = line.replace(/^\s*(\d+\s*[.)]|[-\u2013\u2022*])\s*/u, '');                                 // "1." "2)" "-" "•"
+    const song = newSong(line);
+    if (!song.title || line.length > 160) { result.warnings.push(`Línea ignorada: ${line.slice(0, 40)}`); continue; }
+    song.parts = null; // instrumentos por defecto
+    result.songs.push(song);
+  }
+  return result;
+}
+
+// Acepta la lista de WhatsApp (con ✅ por instrumento) o una lista simple "Título – Artista".
+export function parseLista(text) {
+  const conMarcas = parseConMarcas(text);
+  return conMarcas.songs.length ? conMarcas : parseSimple(text);
 }

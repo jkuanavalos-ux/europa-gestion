@@ -1,6 +1,6 @@
 import {readPhoto} from './photos.js';
 import {load,save,uid,money,safeLink,shared,resolvePhoto,peek,adopt,currentRevision} from './store.js';
-import {songKey,partsOf,findSong,mergeParts,editParts,songProgress,repertoireProgress} from './canciones.js';
+import {songKey,normalize,partsOf,findSong,mergeParts,editParts,songProgress,repertoireProgress} from './canciones.js';
 import {crearMarcador} from './marcas.js';
 import {parseLista} from './importar.js';
 import {KINDS,ICONS,DEFAULT_RESOURCES,webLink,normalizeUrl,shortUrl} from './recursos.js';
@@ -102,9 +102,9 @@ function editRep(r){
       await commit(d=>{
         const ids=rows.map(row=>{
           let song=row.id?d.songs.find(x=>x.id===row.id):null;
-          if(song&&songKey(song.title,song.artist)!==songKey(row.title,row.artist)){
-            const other=findSong(d.songs,row.title,row.artist,song.id);
-            if(other)song=other; else{song.title=row.title;song.artist=row.artist} // corregir el nombre no pierde las marcas
+          if(song&&(song.title!==row.title||song.artist!==row.artist)){
+            const other=songKey(song.title,song.artist)!==songKey(row.title,row.artist)?findSong(d.songs,row.title,row.artist,song.id):null;
+            if(other)song=other; else{song.title=row.title;song.artist=row.artist} // corregir el nombre o el artista no pierde las marcas
           }
           if(!song)song=findSong(d.songs,row.title,row.artist);
           const pasted=imported.get(songKey(row.title,row.artist));
@@ -125,12 +125,21 @@ function editRep(r){
   $('#songAdd').onclick=()=>add();
   $('#pasteLoad').onclick=()=>{
     const parsed=parseLista($('#paste').value);
-    if(!parsed.songs.length){$('#pasteMsg').textContent='No encontré canciones. Cada una tiene que empezar con un guion, por ejemplo: - *Nombre*';return}
+    if(!parsed.songs.length){$('#pasteMsg').textContent='No encontré canciones. Pegá una por línea, por ejemplo: Tan Lejos – No Te Va Gustar';return}
     if(!$('#title').value.trim()&&parsed.title)$('#title').value=parsed.title;
-    const present=new Set([...$('#rows').children].map(row=>songKey(row.querySelector('[name="song"]').value,row.querySelector('[name="artist"]').value)));
-    let added=0;
-    parsed.songs.forEach(s=>{const k=songKey(s.title,s.artist);if(s.parts)imported.set(k,s.parts);if(!present.has(k)){present.add(k);add({title:s.title,artist:s.artist});added++}});
-    $('#pasteMsg').textContent=`Listo: ${parsed.songs.length} canciones leídas (${added} nuevas en el repertorio)${parsed.warnings.length?` · ${parsed.warnings.length} línea(s) ignorada(s)`:''}. Revisá y tocá «Guardar cambios».`;
+    const rows=()=>[...$('#rows').children],field=(row,name)=>row.querySelector(`[name="${name}"]`);
+    const used=new Set();let added=0,updated=0;
+    parsed.songs.forEach(s=>{
+      // Si el repertorio ya tiene esa canción (mismo título), se completa su artista y nombre en vez de duplicarla.
+      let row=rows().find(x=>!used.has(x)&&normalize(field(x,'song').value)===normalize(s.title));
+      if(row){
+        if(field(row,'song').value!==s.title||(s.artist&&field(row,'artist').value!==s.artist))updated++;
+        field(row,'song').value=s.title;if(s.artist)field(row,'artist').value=s.artist;
+      }else{add({title:s.title,artist:s.artist});row=rows().at(-1);added++}
+      used.add(row);
+      if(s.parts)imported.set(songKey(field(row,'song').value,field(row,'artist').value),s.parts);
+    });
+    $('#pasteMsg').textContent=`Listo: ${parsed.songs.length} canciones leídas (${added} nuevas, ${updated} actualizadas).${$('#title').value.trim()?'':' Falta el título del repertorio.'} Revisá y tocá «Guardar cambios».`;
   };
 }
 
