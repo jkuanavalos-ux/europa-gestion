@@ -1,4 +1,5 @@
 import {createHash,timingSafeEqual,randomUUID} from 'node:crypto';
+import {validateExtras} from './_validar.js';
 const hash=s=>createHash('sha256').update(s).digest();
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
@@ -29,6 +30,7 @@ export default async function handler(req,res){
   if(!Number.isSafeInteger(body?.revision)||body.revision<0||!body.data)return reply(400,'Datos inválidos');
   const data=body.data;
   for(const name of ['repertoires','songs','events','movements','members','goals','equipment'])if(!Array.isArray(data[name]))return reply(400,'Datos incompletos');
+  const invalid=validateExtras(data);if(invalid)return reply(400,invalid);
   if(Buffer.byteLength(JSON.stringify(data))>3500000)return reply(413,'Demasiados datos en un envío. Guardá menos fotos a la vez.');
   for(const item of [...data.events,...data.equipment])if(item.photo){
    if(item.photo.startsWith('data:image/jpeg;base64,')){

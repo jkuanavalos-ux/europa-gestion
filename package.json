@@ -1,1 +1,1 @@
-{"name":"europa-local","private":true,"type":"module","scripts":{"start":"node server.js","dev":"node server.js"}}
+{"name": "europa-local", "private": true, "type": "module", "scripts": {"start": "node server.js", "dev": "node server.js", "test": "node --test tests/*.test.js"}}
