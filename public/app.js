@@ -130,8 +130,10 @@ function editRep(r){
   modal(r?'Editar repertorio':'Nuevo repertorio',
     field('Título del repertorio','title',r?.title||'','text','required maxlength="100"')
     +'<label>Canciones · título y artista (opcional)</label><div id="rows"></div><button type="button" id="songAdd">+ Agregar canción</button>'
+    +(data.songs.length?`<details class="library"${r?'':' open'}><summary>Elegir de mis canciones (${data.songs.length})</summary><input type="search" id="libSearch" placeholder="Buscar por título o artista" aria-label="Buscar en mis canciones" autocomplete="off"><div id="libList" class="liblist"></div></details>`:'')
     +'<details class="paste"><summary>Pegar lista (WhatsApp)</summary><p class="muted">Pegá la lista con sus ✅ y tocá «Cargar lista». Las marcas pegadas se suman a las que ya existan, nunca desmarcan.</p><textarea id="paste" rows="8" placeholder="*MI REPERTORIO*&#10;- *Canción*&#10;Voz:✅&#10;Coros:&#10;Bajo:✅"></textarea><button type="button" id="pasteLoad">Cargar lista</button> <small id="pasteMsg"></small></details>'
-    +field('Enlace de la playlist (opcional)','playlist',r?.playlist||'','url'),
+    +field('Enlace de la playlist (opcional)','playlist',r?.playlist||'','url')
+    +(r?'<button type="button" class="danger" id="delRep">Eliminar repertorio</button>':''),
     async f=>{
       const title=f.get('title').trim();
       if(!title)throw Error('Escribí un título.');
@@ -152,18 +154,41 @@ function editRep(r){
           return song.id;
         });
         const value={id:r?.id||uid(),title,playlist,songIds:[...new Set(ids)]};
-        if(r)d.repertoires=d.repertoires.map(x=>x.id===r.id?value:x);else d.repertoires.push(value);
+        if(r)d.repertoires=d.repertoires.map(x=>x.id===r.id?value:x);else d.repertoires.unshift(value); // los nuevos aparecen arriba
       });
     });
+  let refreshLib=()=>{};
   const add=s=>{
     const row=document.createElement('div');row.className='songrow';row.dataset.songId=s?.id||'';
     row.innerHTML=`<input name="song" aria-label="Título de canción" placeholder="Canción" value="${esc(s?.title)}" required><input name="artist" aria-label="Artista (opcional)" placeholder="Artista (opcional)" value="${esc(s?.artist)}"><span class="rowbtns"><button type="button" data-row="up" aria-label="Subir canción">↑</button><button type="button" data-row="down" aria-label="Bajar canción">↓</button><button type="button" data-row="del" aria-label="Quitar canción">×</button></span>`;
     row.querySelector('[data-row=up]').onclick=()=>{const p=row.previousElementSibling;if(p)p.before(row)};
     row.querySelector('[data-row=down]').onclick=()=>{const n=row.nextElementSibling;if(n)n.after(row)};
-    row.querySelector('[data-row=del]').onclick=()=>row.remove();$('#rows').append(row);
+    row.querySelector('[data-row=del]').onclick=()=>{row.remove();refreshLib()};$('#rows').append(row);refreshLib();
   };
   (r?.songIds||[]).forEach(id=>add(data.songs.find(s=>s.id===id)));
   $('#songAdd').onclick=()=>add();
+  // Elegir canciones que ya existen (con sus marcas) en vez de volver a escribirlas.
+  if($('#libList')){
+    const renderLib=()=>{
+      const q=normalize($('#libSearch').value),rows=[...$('#rows').children];
+      const ids=new Set(rows.map(row=>row.dataset.songId).filter(Boolean));
+      const keys=new Set(rows.map(row=>songKey(row.querySelector('[name="song"]').value,row.querySelector('[name="artist"]').value)));
+      const found=data.songs.filter(s=>!q||normalize(`${s.title} ${s.artist}`).includes(q)).sort((a,b)=>normalize(a.title).localeCompare(normalize(b.title)));
+      const shown=found.slice(0,40);
+      $('#libList').innerHTML=shown.map(s=>{const present=ids.has(s.id)||keys.has(songKey(s.title,s.artist));return `<div class="libitem"><span><strong>${esc(s.title)}</strong>${s.artist?`<small>${esc(s.artist)}</small>`:''}</span><button type="button" data-lib="${esc(s.id)}" ${present?'disabled':''}>${present?'✓ Agregada':'+ Agregar'}</button></div>`}).join('')
+        ||`<p class="muted">${q?'No encontré canciones con eso. Podés escribirla como nueva con «+ Agregar canción».':'Todavía no hay canciones.'}</p>`;
+      if(found.length>shown.length)$('#libList').insertAdjacentHTML('beforeend',`<p class="muted">Mostrando ${shown.length} de ${found.length}. Escribí para filtrar.</p>`);
+      $('#libList').querySelectorAll('[data-lib]').forEach(b=>b.onclick=()=>add(data.songs.find(s=>s.id===b.dataset.lib)));
+    };
+    refreshLib=renderLib;
+    $('#libSearch').oninput=renderLib;
+    $('#libSearch').onkeydown=e=>{if(e.key==='Enter')e.preventDefault()}; // Enter no guarda el formulario
+    renderLib();
+  }
+  if(r)$('#delRep').onclick=async()=>{
+    if(!confirm(`¿Eliminar el repertorio «${r.title}»?\n\nLas canciones y sus marcas no se borran: quedan en tu biblioteca para usarlas en otro repertorio.`))return;
+    try{await commit(d=>{d.repertoires=d.repertoires.filter(x=>x.id!==r.id)});$('#modal').close();detail=null;ordering=null;render()}catch(e){$('#error').textContent=e.message}
+  };
   $('#pasteLoad').onclick=()=>{
     const parsed=parseLista($('#paste').value);
     if(!parsed.songs.length){$('#pasteMsg').textContent='No encontré canciones. Pegá una por línea, por ejemplo: Tan Lejos – No Te Va Gustar';return}
@@ -180,6 +205,7 @@ function editRep(r){
       used.add(row);
       if(s.parts)imported.set(songKey(field(row,'song').value,field(row,'artist').value),s.parts);
     });
+    refreshLib();
     $('#pasteMsg').textContent=`Listo: ${parsed.songs.length} canciones leídas (${added} nuevas, ${updated} actualizadas).${$('#title').value.trim()?'':' Falta el título del repertorio.'} Revisá y tocá «Guardar cambios».`;
   };
 }

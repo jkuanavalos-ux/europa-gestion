@@ -12,10 +12,16 @@ Para la versión compartida: reemplazar la capa de persistencia por un repositor
 
 ## Secciones principales
 - **Repertorios:** cada canción tiene casillas por instrumento (Voz, Coros, Guitarra 2, Guitarra 1, Bajo, Batería y los que se agreguen). Cualquiera con el enlace puede marcar «ya lo aprendí». El estado vive en la **canción**, así que si el tema está en otro repertorio conserva sus marcas.
+- **Armar repertorios:** al crear o editar se pueden elegir canciones que ya existen (con buscador por título o artista, sin importar tildes ni mayúsculas) y también escribir canciones nuevas. Los repertorios nuevos aparecen arriba.
+- **Ordenar:** *↕ Ordenar* en la lista (repertorios) y *↕ Ordenar canciones* dentro de cada repertorio, con ▲ ▼ y *Guardar orden*. El editor también tiene flechas ↑ ↓ por fila.
+- **Eliminar:** *Editar repertorio → Eliminar repertorio*. Las canciones y sus marcas se conservan en la biblioteca.
 - **Recursos:** enlaces de la banda (redes, Drive…) para abrir o copiar. Se agregan, editan y eliminan desde la propia pestaña.
 - La pestaña *Objetivos* se quitó. Los datos viejos (`goals`) siguen guardados en la base, solo que ocultos.
 
-## Pegar una lista de WhatsApp
+## Pegar una lista
+En *Crear/Editar repertorio → Pegar lista* se acepta una canción por línea (`Título – Artista`, con o sin número o viñeta) o el formato de WhatsApp de abajo. Si el repertorio ya tiene la canción, se completa su artista y nombre en vez de duplicarla.
+
+### Formato de WhatsApp
 En *Crear/Editar repertorio → Pegar lista* se puede pegar un texto como este (✅ = ya lo aprendió):
 
 ```
