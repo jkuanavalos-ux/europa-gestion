@@ -2,6 +2,7 @@ import {readPhoto} from './photos.js';
 import {load,save,uid,money,safeLink,shared,resolvePhoto,peek,adopt,currentRevision} from './store.js';
 import {songKey,normalize,partsOf,findSong,mergeParts,editParts,songProgress,repertoireProgress} from './canciones.js';
 import {crearMarcador} from './marcas.js';
+import {moveId,applyOrder} from './orden.js';
 import {parseLista} from './importar.js';
 import {KINDS,ICONS,DEFAULT_RESOURCES,webLink,normalizeUrl,shortUrl} from './recursos.js';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -11,7 +12,7 @@ let busy=0;
 let data;try{data=prepare(await load())}catch(error){document.body.innerHTML='<main><h1>Europa</h1><p id=accessError></p><button onclick=location.reload()>Reintentar</button></main>';document.querySelector('#accessError').textContent=error.message;throw error}
 $('.local').textContent=shared?'● Espacio compartido':'● Demo local';
 $('footer small').textContent=shared?'Datos compartidos de Europa.':'Los datos se guardan en este navegador.';
-const tabs={repertorios:'Repertorios',fechas:'Próximas Fechas',canciones:'Canciones',ahorros:'Ahorros',recursos:'Recursos',equipamientos:'Equipamientos'};let active='repertorios',detail=null;
+const tabs={repertorios:'Repertorios',fechas:'Próximas Fechas',canciones:'Canciones',ahorros:'Ahorros',recursos:'Recursos',equipamientos:'Equipamientos'};let active='repertorios',detail=null,ordering=null; // ordering: borrador del orden mientras se mueve con ▲ ▼
 async function commit(fn){while(marcador.ocupado())await marcador.esperar();const next=structuredClone(data);fn(next);toast('Guardando…');busy++;try{data=prepare(await save(next))}finally{busy--}render();toast('Cambios guardados')}
 function toast(t){$('#toast').textContent=t;$('#toast').style.display='block';setTimeout(()=>$('#toast').style.display='none',2800)}
 const empty=t=>`<div class="empty">${t}</div>`;
@@ -20,7 +21,7 @@ const date=d=>d?new Date(d+'T12:00:00').toLocaleDateString('es-PY',{day:'numeric
 function modal(title,html,onSave){$('#modalTitle').textContent=title;$('#fields').innerHTML=html;$('#error').textContent='';$('#form').onsubmit=async e=>{e.preventDefault();const button=e.target.querySelector('.actions .primary');button.disabled=true;try{await onSave(new FormData(e.target));$('#modal').close()}catch(err){$('#error').textContent=err.message}finally{button.disabled=false}};$('#modal').showModal()}
 $('#close').onclick=$('#cancel').onclick=()=>$('#modal').close();
 function head(title,sub,button){return `<div class="sectionhead"><div><h2>${title}</h2><p>${sub}</p></div>${button||''}</div>`}
-function render(){active=location.hash.slice(1) in tabs?location.hash.slice(1):'repertorios';$('#nav').innerHTML=Object.entries(tabs).map(([k,v])=>`<button data-tab="${k}" class="${k===active?'active':''}">${v}</button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{detail=null;location.hash=b.dataset.tab;render()});const c=$('#content');
+function render(){active=location.hash.slice(1) in tabs?location.hash.slice(1):'repertorios';$('#nav').innerHTML=Object.entries(tabs).map(([k,v])=>`<button data-tab="${k}" class="${k===active?'active':''}">${v}</button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{detail=null;ordering=null;location.hash=b.dataset.tab;render()});const c=$('#content');
 if(active==='repertorios')renderRepertorios(c);
 if(active==='canciones'){c.innerHTML=head('Canciones',`${data.songs.length} canciones en la biblioteca de Europa.`)+ '<input class="search" id="search" placeholder="Buscar canción o artista" aria-label="Buscar canciones"><div id="songs"></div>';const list=()=>{const q=$('#search').value.toLowerCase();const groups={};data.songs.filter(s=>(s.title+' '+s.artist).toLowerCase().includes(q)).forEach(s=>(groups[s.artist||'Sin artista']??=[]).push(s));$('#songs').innerHTML=Object.keys(groups).sort((a,b)=>a.localeCompare(b)).map(a=>`<article class="detail" style="margin-bottom:16px"><h3>${esc(a)}</h3>${groups[a].sort((a,b)=>a.title.localeCompare(b.title)).map(s=>`<div class="row"><div>${esc(s.title)}</div><small>${data.repertoires.filter(r=>r.songIds.includes(s.id)).length} repertorio(s)</small></div>`).join('')}</article>`).join('')||empty('Las canciones que agregues a tus repertorios aparecerán acá.')};$('#search').oninput=list;list()}
 if(active==='recursos')renderResources(c);
@@ -50,16 +51,53 @@ function renderEquipment(c){
 }
 function editEquipment(e){modal(e?'Editar equipamiento':'Nuevo equipamiento',photoFields(e?.photo)+field('Nombre del equipamiento','title',e?.title||'','text','required maxlength="150"')+field('Costo aproximado (Gs)','cost',e?.cost??'','number','required min="0" step="1"')+`<label for="notes">Información (opcional)</label><textarea id="notes" name="notes" placeholder="Modelo, características, dónde comprar…">${esc(e?.notes)}</textarea>`,async f=>{const title=f.get('title').trim(),cost=Number(f.get('cost'));if(!title)throw Error('Escribí el nombre del equipamiento.');if(!Number.isSafeInteger(cost)||cost<0)throw Error('Ingresá un costo válido en guaraníes.');const photo=await photoValue(f,e?.photo);const value={id:e?.id||uid(),title,cost,photo,notes:f.get('notes').trim()};await commit(d=>{if(e)d.equipment=d.equipment.map(x=>x.id===e.id?value:x);else d.equipment.push(value)})})}
 
+// Orden: ▲ ▼ modifican un borrador y se guarda todo junto con «Guardar orden».
+const orderRows=items=>items.map((it,i)=>`<div class="row orden"><span class="muted">${String(i+1).padStart(2,'0')}</span><div><h3>${esc(it.title)}</h3>${it.sub?`<small>${esc(it.sub)}</small>`:''}</div><div class="ordenbtns"><button type="button" class="chip" data-move="-1" data-id="${esc(it.id)}" aria-label="Subir ${esc(it.title)}" ${i===0?'disabled':''}>▲</button><button type="button" class="chip" data-move="1" data-id="${esc(it.id)}" aria-label="Bajar ${esc(it.title)}" ${i===items.length-1?'disabled':''}>▼</button></div></div>`).join('');
+function renderOrder(c,title,sub,items){
+  c.innerHTML=head(title,sub,'<div class="toolbar"><button type="button" id="orderCancel">Cancelar</button><button type="button" class="primary" id="orderSave">Guardar orden</button></div>')+`<div class="detail ordenlist">${orderRows(items)}</div>`;
+  c.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{
+    const {id,move}=b.dataset;
+    ordering.ids=moveId(ordering.ids,id,Number(move));
+    render();
+    // el foco sigue al elemento movido, para poder tocar varias veces seguidas
+    const mine=[...c.querySelectorAll('[data-move]')].filter(x=>x.dataset.id===id);
+    const next=mine.find(x=>x.dataset.move===move&&!x.disabled)||mine.find(x=>!x.disabled);
+    next?.focus();next?.scrollIntoView?.({block:'nearest'});
+  });
+  $('#orderCancel').onclick=()=>{ordering=null;render()};
+  $('#orderSave').onclick=saveOrder;
+}
+async function saveOrder(){
+  const o=ordering;if(!o)return;
+  const apply=d=>{
+    if(o.type==='reps'){const byId=new Map(d.repertoires.map(x=>[x.id,x]));d.repertoires=applyOrder(d.repertoires.map(x=>x.id),o.ids).map(id=>byId.get(id))}
+    else{const rep=d.repertoires.find(x=>x.id===o.repId);if(rep)rep.songIds=applyOrder(rep.songIds,o.ids)}
+  };
+  try{
+    try{await commit(apply)}catch(e){if(e.status!==409)throw e;data=prepare(await load());await commit(apply)} // si otra persona guardó en medio, se reaplica el orden sobre lo nuevo
+    ordering=null;render();
+  }catch(e){toast(e.message)}
+}
+
 // ───────────────────────── Repertorios y casillas "ya lo aprendí" ─────────────────────────
 const songsOf=r=>r.songIds.map(id=>data.songs.find(x=>x.id===id)).filter(Boolean);
 function renderRepertorios(c){
   const r=data.repertoires.find(x=>x.id===detail);
   if(!r){
-    c.innerHTML=head('Repertorios','Cada show empieza con una buena selección.','<button class="primary" id="add">+ Crear repertorio</button>')
+    if(ordering?.type==='reps'){
+      const items=ordering.ids.map(id=>data.repertoires.find(x=>x.id===id)).filter(Boolean).map(x=>({id:x.id,title:x.title,sub:`${songsOf(x).length} canciones`}));
+      return renderOrder(c,'Ordenar repertorios','Usá ▲ ▼ para mover cada repertorio y tocá «Guardar orden».',items);
+    }
+    c.innerHTML=head('Repertorios','Cada show empieza con una buena selección.',`<div class="toolbar">${data.repertoires.length>1?'<button type="button" id="order">↕ Ordenar</button>':''}<button class="primary" id="add">+ Crear repertorio</button></div>`)
       +`<div class="grid">${data.repertoires.map(rep=>{const p=repertoireProgress(songsOf(rep));return `<button class="card repcard" data-id="${esc(rep.id)}"><span>${esc(rep.title)}<small class="repmeta">${songsOf(rep).length} canciones${p.total?` · ${p.percent}% aprendido`:''}</small></span><span>↗</span></button>`}).join('')||empty('Creá el primer repertorio de Europa.')}</div>`;
     $('#add').onclick=()=>editRep();
+    if($('#order'))$('#order').onclick=()=>{ordering={type:'reps',ids:data.repertoires.map(x=>x.id)};render()};
     c.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{detail=b.dataset.id;render()});
     return;
+  }
+  if(ordering?.type==='songs'&&ordering.repId===r.id){
+    const items=ordering.ids.map(id=>data.songs.find(x=>x.id===id)).filter(Boolean).map(s=>({id:s.id,title:s.title,sub:s.artist}));
+    return renderOrder(c,esc(r.title),'Ordená las canciones con ▲ ▼ y tocá «Guardar orden». El orden es el del show.',items);
   }
   const songs=songsOf(r),p=repertoireProgress(songs);
   const learned=p.total?`<div class="learned"><div class="learnedtop"><strong>Aprendido: ${p.percent}%</strong><small>${p.done} de ${p.total} casillas</small></div><div class="bar"><div style="width:${p.percent}%"></div></div><div class="byinstrument">${p.byPart.map(x=>`<span>${esc(x.name)} ${x.done}/${x.total}</span>`).join('')}</div></div>`:'';
@@ -68,9 +106,10 @@ function renderRepertorios(c){
     return `<div class="row songitem"><span class="muted">${String(i+1).padStart(2,'0')}</span><div class="songmain"><div class="songhead"><div><h3>${esc(s.title)}</h3>${s.artist?`<small>${esc(s.artist)}</small>`:''}</div><span class="badge${sp.done===sp.total?' complete':''}">${sp.done}/${sp.total}</span></div><div class="chips">${partsOf(s).map(part=>`<button type="button" class="chip" aria-pressed="${part.done}" data-song="${esc(s.id)}" data-part="${esc(part.name)}">${part.done?'✓ ':''}${esc(part.name)}</button>`).join('')}<button type="button" class="linkbtn" data-parts="${esc(s.id)}">Editar instrumentos</button></div></div></div>`;
   }).join('');
   const link=webLink(r.playlist);
-  c.innerHTML=`<button class="back" id="back">← Repertorios</button>${head(esc(r.title),'El orden de las canciones es el orden del show. Tocá tu instrumento cuando ya lo tengas aprendido.','<button class="primary" id="edit">Editar repertorio</button>')}<div class="detail">${learned}${rows||empty('Todavía no agregaste canciones.')}${link?`<a class="playlist" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Escuchar playlist ↗</a>`:''}</div>`;
-  $('#back').onclick=()=>{detail=null;render()};
+  c.innerHTML=`<button class="back" id="back">← Repertorios</button>${head(esc(r.title),'El orden de las canciones es el orden del show. Tocá tu instrumento cuando ya lo tengas aprendido.',`<div class="toolbar">${songs.length>1?'<button type="button" id="order">↕ Ordenar canciones</button>':''}<button class="primary" id="edit">Editar repertorio</button></div>`)}<div class="detail">${learned}${rows||empty('Todavía no agregaste canciones.')}${link?`<a class="playlist" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Escuchar playlist ↗</a>`:''}</div>`;
+  $('#back').onclick=()=>{detail=null;ordering=null;render()};
   $('#edit').onclick=()=>editRep(r);
+  if($('#order'))$('#order').onclick=()=>{ordering={type:'songs',repId:r.id,ids:songs.map(s=>s.id)};render()};
   c.querySelectorAll('[data-part]').forEach(b=>b.onclick=()=>marcador.marcar(b.dataset.song,b.dataset.part,b.getAttribute('aria-pressed')!=='true'));
   c.querySelectorAll('[data-parts]').forEach(b=>b.onclick=()=>editSongParts(data.songs.find(x=>x.id===b.dataset.parts)));
 }
@@ -118,8 +157,10 @@ function editRep(r){
     });
   const add=s=>{
     const row=document.createElement('div');row.className='songrow';row.dataset.songId=s?.id||'';
-    row.innerHTML=`<input name="song" aria-label="Título de canción" placeholder="Canción" value="${esc(s?.title)}" required><input name="artist" aria-label="Artista (opcional)" placeholder="Artista (opcional)" value="${esc(s?.artist)}"><button type="button" aria-label="Quitar canción">×</button>`;
-    row.querySelector('button').onclick=()=>row.remove();$('#rows').append(row);
+    row.innerHTML=`<input name="song" aria-label="Título de canción" placeholder="Canción" value="${esc(s?.title)}" required><input name="artist" aria-label="Artista (opcional)" placeholder="Artista (opcional)" value="${esc(s?.artist)}"><span class="rowbtns"><button type="button" data-row="up" aria-label="Subir canción">↑</button><button type="button" data-row="down" aria-label="Bajar canción">↓</button><button type="button" data-row="del" aria-label="Quitar canción">×</button></span>`;
+    row.querySelector('[data-row=up]').onclick=()=>{const p=row.previousElementSibling;if(p)p.before(row)};
+    row.querySelector('[data-row=down]').onclick=()=>{const n=row.nextElementSibling;if(n)n.after(row)};
+    row.querySelector('[data-row=del]').onclick=()=>row.remove();$('#rows').append(row);
   };
   (r?.songIds||[]).forEach(id=>add(data.songs.find(s=>s.id===id)));
   $('#songAdd').onclick=()=>add();
@@ -183,13 +224,13 @@ function editResource(res){
 const marcador=crearMarcador({getData:()=>data,setData:d=>{data=d},load:async()=>prepare(await load()),save:async d=>prepare(await save(d)),render:()=>render(),avisar:toast,antesDeGuardar:async()=>{while(busy)await new Promise(r=>setTimeout(r,60))}});
 // Para ver las marcas de los demás sin recargar: al volver a la pestaña y cada 30 segundos (solo si no hay nada en curso).
 async function refresh(){
-  const editing=()=>busy||marcador.ocupado()||$('#modal').open||/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||'');
+  const editing=()=>busy||ordering||marcador.ocupado()||$('#modal').open||/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||'');
   if(!shared||document.hidden||editing())return;
   try{const res=await peek();if(!res||editing()||res.revision<=currentRevision())return;adopt(res.revision);data=prepare(res.data);render()}catch{/* se reintenta en la próxima */}
 }
 if(shared){setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh)}
 
-window.addEventListener('hashchange',()=>{detail=null;render()});render();
+window.addEventListener('hashchange',()=>{detail=null;ordering=null;render()});render();
 
 async function hydratePhotos(){for(const img of document.querySelectorAll('img[data-photo]')){const ref=img.dataset.photo;delete img.dataset.photo;try{img.src=await resolvePhoto(ref)}catch{img.alt='Foto no disponible'}}}
 new MutationObserver(hydratePhotos).observe(document.body,{childList:true,subtree:true});hydratePhotos();
