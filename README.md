@@ -16,7 +16,8 @@ Para la versión compartida: reemplazar la capa de persistencia por un repositor
 - **Ordenar:** *↕ Ordenar* en la lista (repertorios) y *↕ Ordenar canciones* dentro de cada repertorio, con ▲ ▼ y *Guardar orden*. El editor también tiene flechas ↑ ↓ por fila.
 - **Eliminar:** *Editar repertorio → Eliminar repertorio*. Las canciones y sus marcas se conservan en la biblioteca.
 - **Recursos:** enlaces de la banda (redes, Drive…) para abrir o copiar. Se agregan, editan y eliminan desde la propia pestaña.
-- La pestaña *Objetivos* se quitó. Los datos viejos (`goals`) siguen guardados en la base, solo que ocultos.
+- **Próximas fechas:** las fechas nuevas se agregan arriba. Se pueden reordenar (*↕ Ordenar*, con ▲ ▼ o *Por fecha*) y eliminar (*Eliminar fecha* dentro de cada una).
+- Las pestañas *Objetivos* y *Ahorros* se quitaron (sus datos, `goals` y `movements`, siguen guardados pero ocultos). Los datos viejos (`goals`) siguen guardados en la base, solo que ocultos.
 
 ## Pegar una lista
 En *Crear/Editar repertorio → Pegar lista* se acepta una canción por línea (`Título – Artista`, con o sin número o viñeta) o el formato de WhatsApp de abajo. Si el repertorio ya tiene la canción, se completa su artista y nombre en vez de duplicarla.

@@ -12,7 +12,7 @@ let busy=0;
 let data;try{data=prepare(await load())}catch(error){document.body.innerHTML='<main><h1>Europa</h1><p id=accessError></p><button onclick=location.reload()>Reintentar</button></main>';document.querySelector('#accessError').textContent=error.message;throw error}
 $('.local').textContent=shared?'● Espacio compartido':'● Demo local';
 $('footer small').textContent=shared?'Datos compartidos de Europa.':'Los datos se guardan en este navegador.';
-const tabs={repertorios:'Repertorios',fechas:'Próximas Fechas',canciones:'Canciones',ahorros:'Ahorros',recursos:'Recursos',equipamientos:'Equipamientos'};let active='repertorios',detail=null,ordering=null,marking=null; // marking: id del repertorio en vista de marcar progreso // ordering: borrador del orden mientras se mueve con ▲ ▼
+const tabs={repertorios:'Repertorios',fechas:'Próximas Fechas',canciones:'Canciones',recursos:'Recursos',equipamientos:'Equipamientos'};let active='repertorios',detail=null,ordering=null,marking=null; // marking: id del repertorio en vista de marcar progreso // ordering: borrador del orden mientras se mueve con ▲ ▼
 async function commit(fn){while(marcador.ocupado())await marcador.esperar();const next=structuredClone(data);fn(next);toast('Guardando…');busy++;try{data=prepare(await save(next))}finally{busy--}render();toast('Cambios guardados')}
 function toast(t){$('#toast').textContent=t;$('#toast').style.display='block';setTimeout(()=>$('#toast').style.display='none',2800)}
 const empty=t=>`<div class="empty">${t}</div>`;
@@ -26,21 +26,28 @@ if(active==='repertorios')renderRepertorios(c);
 if(active==='canciones'){c.innerHTML=head('Canciones',`${data.songs.length} canciones en la biblioteca de Europa.`)+ '<input class="search" id="search" placeholder="Buscar canción o artista" aria-label="Buscar canciones"><div id="songs"></div>';const list=()=>{const q=$('#search').value.toLowerCase();const groups={};data.songs.filter(s=>(s.title+' '+s.artist).toLowerCase().includes(q)).forEach(s=>(groups[s.artist||'Sin artista']??=[]).push(s));$('#songs').innerHTML=Object.keys(groups).sort((a,b)=>a.localeCompare(b)).map(a=>`<article class="detail" style="margin-bottom:16px"><h3>${esc(a)}</h3>${groups[a].sort((a,b)=>a.title.localeCompare(b.title)).map(s=>`<div class="row"><div>${esc(s.title)}</div><small>${data.repertoires.filter(r=>r.songIds.includes(s.id)).length} repertorio(s)</small></div>`).join('')}</article>`).join('')||empty('Las canciones que agregues a tus repertorios aparecerán acá.')};$('#search').oninput=list;list()}
 if(active==='recursos')renderResources(c);
 if(active==='equipamientos')renderEquipment(c);
-if(active==='fechas'){c.innerHTML=head('Próximas Fechas','La agenda de la banda, siempre a mano.','<button class="primary" id="add">+ Agregar fecha</button>')+`<div class="grid">${[...data.events].sort((a,b)=>a.date.localeCompare(b.date)).map(e=>`<button class="card" data-id="${e.id}">${photoMarkup(e.photo,e.title)}<span class="date">${date(e.date)} · ${esc(e.time)}</span><h3>${esc(e.title)}</h3><small>${esc(e.venue)}${e.date<new Date().toLocaleDateString('en-CA')?' · Finalizado':''}</small></button>`).join('')||empty('La próxima fecha empieza acá. Agregá un concierto.')}</div>`;$('#add').onclick=()=>editEvent();c.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>editEvent(data.events.find(e=>e.id===b.dataset.id)))}
-if(active==='ahorros'){
- const total=data.movements.reduce((sum,m)=>sum+(m.type==='ingreso'?m.amount:-m.amount),0);
- c.innerHTML=head('Ahorros','Cada aporte nos acerca al próximo paso.','<button class="primary" id="income">+ Aportar</button>')+`<div class="balance"><small>TOTAL AHORRADO</small><strong>${money(total)}</strong></div>`;
- $('#income').onclick=()=>movement();
-}}
+if(active==='fechas')renderEvents(c);
+}
 // editRep: ver más abajo (versión legible)
-function editEvent(e){modal(e?'Detalles del evento':'Nueva fecha',photoFields(e?.photo)+field('Nombre del evento','title',e?.title||'','text','required')+field('Fecha','date',e?.date||'','date','required')+field('Horario','time',e?.time||'','time')+field('Lugar y dirección','venue',e?.venue||'','text','required')+`<label for="repertoire">Repertorio</label><select id="repertoire" name="repertoire"><option value="">Por definir</option>${data.repertoires.map(r=>`<option value="${r.id}" ${r.id===e?.repertoire?'selected':''}>${esc(r.title)}</option>`).join('')}</select>`+field('Enlace del evento (opcional)','link',e?.link||'','url')+`<label for="notes">Detalles y notas</label><textarea name="notes" id="notes">${esc(e?.notes)}</textarea>`,async f=>{const photo=await photoValue(f,e?.photo);f.delete('photoFile');f.delete('removePhoto');const value={...Object.fromEntries(f),photo,id:e?.id||uid(),link:safeLink(f.get('link'))};if(!value.title.trim()||!value.venue.trim())throw Error('Completá nombre y lugar.');await commit(d=>{if(e)d.events=d.events.map(x=>x.id===e.id?value:x);else d.events.push(value)})})}
-function movement(){
- const now=new Date();const pad=n=>String(n).padStart(2,'0');const today=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
- modal('Aportar al ahorro',field('Monto (Gs)','amount','','number','required min="1" step="1"')+field('Fecha del aporte','date',today,'date','required'),async f=>{
-  const amount=Number(f.get('amount'));
-  if(!Number.isSafeInteger(amount)||amount<=0)throw Error('Ingresá un monto entero positivo.');
-  await commit(d=>d.movements.push({amount,date:f.get('date'),type:'ingreso',id:uid(),created:new Date().toISOString()}));
- });
+// ───────────────────────── Próximas fechas ─────────────────────────
+// El orden es el de la lista (no se ordena solo por fecha): las nuevas van arriba y se pueden reordenar.
+function renderEvents(c){
+  if(ordering?.type==='events'){
+    const items=ordering.ids.map(id=>data.events.find(x=>x.id===id)).filter(Boolean).map(e=>({id:e.id,title:e.title,sub:`${date(e.date)}${e.venue?` · ${e.venue}`:''}`}));
+    return renderOrder(c,'Ordenar fechas','Usá ▲ ▼ para mover cada fecha, o «Por fecha» para ordenarlas cronológicamente. Después tocá «Guardar orden».',items,'<button type="button" id="orderByDate">Por fecha</button>');
+  }
+  const today=new Date().toLocaleDateString('en-CA');
+  c.innerHTML=head('Próximas Fechas','La agenda de la banda, siempre a mano.',`<div class="toolbar">${data.events.length>1?'<button type="button" id="order">↕ Ordenar</button>':''}<button class="primary" id="add">+ Agregar fecha</button></div>`)
+    +`<div class="grid">${data.events.map(e=>`<button class="card" data-id="${esc(e.id)}">${photoMarkup(e.photo,e.title)}<span class="date">${date(e.date)} · ${esc(e.time)}</span><h3>${esc(e.title)}</h3><small>${esc(e.venue)}${e.date<today?' · Finalizado':''}</small></button>`).join('')||empty('La próxima fecha empieza acá. Agregá un concierto.')}</div>`;
+  $('#add').onclick=()=>editEvent();
+  if($('#order'))$('#order').onclick=()=>{ordering={type:'events',ids:data.events.map(e=>e.id)};render()};
+  c.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>editEvent(data.events.find(e=>e.id===b.dataset.id)));
+}
+function editEvent(e){modal(e?'Detalles del evento':'Nueva fecha',photoFields(e?.photo)+field('Nombre del evento','title',e?.title||'','text','required')+field('Fecha','date',e?.date||'','date','required')+field('Horario','time',e?.time||'','time')+field('Lugar y dirección','venue',e?.venue||'','text','required')+`<label for="repertoire">Repertorio</label><select id="repertoire" name="repertoire"><option value="">Por definir</option>${data.repertoires.map(r=>`<option value="${r.id}" ${r.id===e?.repertoire?'selected':''}>${esc(r.title)}</option>`).join('')}</select>`+field('Enlace del evento (opcional)','link',e?.link||'','url')+`<label for="notes">Detalles y notas</label><textarea name="notes" id="notes">${esc(e?.notes)}</textarea>`+(e?'<button type="button" class="danger" id="delEvent">Eliminar fecha</button>':''),async f=>{const photo=await photoValue(f,e?.photo);f.delete('photoFile');f.delete('removePhoto');const value={...Object.fromEntries(f),photo,id:e?.id||uid(),link:safeLink(f.get('link'))};if(!value.title.trim()||!value.venue.trim())throw Error('Completá nombre y lugar.');await commit(d=>{if(e)d.events=d.events.map(x=>x.id===e.id?value:x);else d.events.unshift(value)})});
+  if(e)$('#delEvent').onclick=async()=>{
+    if(!confirm(`¿Eliminar la fecha «${e.title}»?`))return;
+    try{await commit(d=>{d.events=d.events.filter(x=>x.id!==e.id)});$('#modal').close()}catch(err){$('#error').textContent=err.message}
+  };
 }
 function photoMarkup(photo,title){return photo?`<img class="entry-photo" ${photo.startsWith('photo:')?`data-photo="${esc(photo)}"`:`src="${esc(photo)}"`} alt="${esc(title)}" loading="lazy">`:''}
 function photoFields(photo){return `${photoMarkup(photo,'Foto guardada')}<label for="photoFile">Foto (opcional)</label><input id="photoFile" name="photoFile" type="file" accept="image/jpeg,image/png,image/webp"><small>JPG, PNG o WebP. Se optimiza al guardar.</small>${photo?'<label class="check"><input type="checkbox" name="removePhoto"> Quitar foto actual</label>':''}`}
@@ -53,8 +60,8 @@ function editEquipment(e){modal(e?'Editar equipamiento':'Nuevo equipamiento',pho
 
 // Orden: ▲ ▼ modifican un borrador y se guarda todo junto con «Guardar orden».
 const orderRows=items=>items.map((it,i)=>`<div class="row orden"><span class="muted">${String(i+1).padStart(2,'0')}</span><div><h3>${esc(it.title)}</h3>${it.sub?`<small>${esc(it.sub)}</small>`:''}</div><div class="ordenbtns"><button type="button" class="chip" data-move="-1" data-id="${esc(it.id)}" aria-label="Subir ${esc(it.title)}" ${i===0?'disabled':''}>▲</button><button type="button" class="chip" data-move="1" data-id="${esc(it.id)}" aria-label="Bajar ${esc(it.title)}" ${i===items.length-1?'disabled':''}>▼</button></div></div>`).join('');
-function renderOrder(c,title,sub,items){
-  c.innerHTML=head(title,sub,'<div class="toolbar"><button type="button" id="orderCancel">Cancelar</button><button type="button" class="primary" id="orderSave">Guardar orden</button></div>')+`<div class="detail ordenlist">${orderRows(items)}</div>`;
+function renderOrder(c,title,sub,items,extra=''){
+  c.innerHTML=head(title,sub,`<div class="toolbar">${extra}<button type="button" id="orderCancel">Cancelar</button><button type="button" class="primary" id="orderSave">Guardar orden</button></div>`)+`<div class="detail ordenlist">${orderRows(items)}</div>`;
   c.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{
     const {id,move}=b.dataset;
     ordering.ids=moveId(ordering.ids,id,Number(move));
@@ -66,11 +73,17 @@ function renderOrder(c,title,sub,items){
   });
   $('#orderCancel').onclick=()=>{ordering=null;render()};
   $('#orderSave').onclick=saveOrder;
+  if($('#orderByDate'))$('#orderByDate').onclick=()=>{
+    const when=id=>data.events.find(e=>e.id===id)?.date||'';
+    ordering.ids=[...ordering.ids].sort((a,b)=>when(a).localeCompare(when(b)));
+    render();
+  };
 }
 async function saveOrder(){
   const o=ordering;if(!o)return;
   const apply=d=>{
     if(o.type==='reps'){const byId=new Map(d.repertoires.map(x=>[x.id,x]));d.repertoires=applyOrder(d.repertoires.map(x=>x.id),o.ids).map(id=>byId.get(id))}
+    else if(o.type==='events'){const byId=new Map(d.events.map(x=>[x.id,x]));d.events=applyOrder(d.events.map(x=>x.id),o.ids).map(id=>byId.get(id))}
     else{const rep=d.repertoires.find(x=>x.id===o.repId);if(rep)rep.songIds=applyOrder(rep.songIds,o.ids)}
   };
   try{
