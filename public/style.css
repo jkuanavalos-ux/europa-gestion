@@ -56,3 +56,18 @@ dialog .danger:hover{background:#fbeeee}
 /* Vista del repertorio: acciones al pie */
 .detailactions{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px}
 .detailactions .playlist{padding:12px 0}
+
+/* Colores de tarjetas */
+.colors{border:0;padding:0;margin:18px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.colors legend{font-size:13px;color:#555;margin-bottom:10px;padding:0;float:left;width:100%}
+.swatch{display:inline-block;position:relative;margin:0}
+.swatch input{position:absolute;opacity:0;width:1px;height:1px}
+.swatch span{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #cfc9bb;cursor:pointer;transition:transform .12s}
+.swatch:hover span{transform:scale(1.08)}
+.swatch input:checked+span{box-shadow:0 0 0 3px #282820}
+.swatch input:focus-visible+span{outline:3px solid #7aa0ff;outline-offset:3px}
+.swatch.none span{background:#fff;color:#8a8578;font-size:18px}
+.card.colored,.repcard.colored{background:color-mix(in srgb,var(--c) 11%,#fff);border-color:color-mix(in srgb,var(--c) 35%,#fff);border-left:7px solid var(--c)}
+.card.colored .tag,.card.colored .date{color:color-mix(in srgb,var(--c) 75%,#282820)}
+.detail.colored{border-top:6px solid var(--c)}
+.row.orden.colored{border-left:6px solid var(--c);padding-left:12px}

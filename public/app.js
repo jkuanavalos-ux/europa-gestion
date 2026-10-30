@@ -3,6 +3,7 @@ import {load,save,uid,money,safeLink,shared,resolvePhoto,peek,adopt,currentRevis
 import {songKey,normalize,partsOf,findSong,mergeParts,editParts,songProgress,repertoireProgress} from './canciones.js';
 import {crearMarcador} from './marcas.js';
 import {moveId,applyOrder} from './orden.js';
+import {safeColor,colorPicker} from './colores.js';
 import {parseLista} from './importar.js';
 import {KINDS,ICONS,DEFAULT_RESOURCES,webLink,normalizeUrl,shortUrl} from './recursos.js';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -33,17 +34,17 @@ if(active==='fechas')renderEvents(c);
 // El orden es el de la lista (no se ordena solo por fecha): las nuevas van arriba y se pueden reordenar.
 function renderEvents(c){
   if(ordering?.type==='events'){
-    const items=ordering.ids.map(id=>data.events.find(x=>x.id===id)).filter(Boolean).map(e=>({id:e.id,title:e.title,sub:`${date(e.date)}${e.venue?` · ${e.venue}`:''}`}));
+    const items=ordering.ids.map(id=>data.events.find(x=>x.id===id)).filter(Boolean).map(e=>({id:e.id,title:e.title,color:e.color,sub:`${date(e.date)}${e.venue?` · ${e.venue}`:''}`}));
     return renderOrder(c,'Ordenar fechas','Usá ▲ ▼ para mover cada fecha, o «Por fecha» para ordenarlas cronológicamente. Después tocá «Guardar orden».',items,'<button type="button" id="orderByDate">Por fecha</button>');
   }
   const today=new Date().toLocaleDateString('en-CA');
   c.innerHTML=head('Próximas Fechas','La agenda de la banda, siempre a mano.',`<div class="toolbar">${data.events.length>1?'<button type="button" id="order">↕ Ordenar</button>':''}<button class="primary" id="add">+ Agregar fecha</button></div>`)
-    +`<div class="grid">${data.events.map(e=>`<button class="card" data-id="${esc(e.id)}">${photoMarkup(e.photo,e.title)}<span class="date">${date(e.date)} · ${esc(e.time)}</span><h3>${esc(e.title)}</h3><small>${esc(e.venue)}${e.date<today?' · Finalizado':''}</small></button>`).join('')||empty('La próxima fecha empieza acá. Agregá un concierto.')}</div>`;
+    +`<div class="grid">${data.events.map(e=>{const col=safeColor(e.color);return `<button class="card${col?' colored':''}"${col?` style="--c:${col}"`:''} data-id="${esc(e.id)}">${photoMarkup(e.photo,e.title)}<span class="date">${date(e.date)} · ${esc(e.time)}</span><h3>${esc(e.title)}</h3><small>${esc(e.venue)}${e.date<today?' · Finalizado':''}</small></button>`}).join('')||empty('La próxima fecha empieza acá. Agregá un concierto.')}</div>`;
   $('#add').onclick=()=>editEvent();
   if($('#order'))$('#order').onclick=()=>{ordering={type:'events',ids:data.events.map(e=>e.id)};render()};
   c.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>editEvent(data.events.find(e=>e.id===b.dataset.id)));
 }
-function editEvent(e){modal(e?'Detalles del evento':'Nueva fecha',photoFields(e?.photo)+field('Nombre del evento','title',e?.title||'','text','required')+field('Fecha','date',e?.date||'','date','required')+field('Horario','time',e?.time||'','time')+field('Lugar y dirección','venue',e?.venue||'','text','required')+`<label for="repertoire">Repertorio</label><select id="repertoire" name="repertoire"><option value="">Por definir</option>${data.repertoires.map(r=>`<option value="${r.id}" ${r.id===e?.repertoire?'selected':''}>${esc(r.title)}</option>`).join('')}</select>`+field('Enlace del evento (opcional)','link',e?.link||'','url')+`<label for="notes">Detalles y notas</label><textarea name="notes" id="notes">${esc(e?.notes)}</textarea>`+(e?'<button type="button" class="danger" id="delEvent">Eliminar fecha</button>':''),async f=>{const photo=await photoValue(f,e?.photo);f.delete('photoFile');f.delete('removePhoto');const value={...Object.fromEntries(f),photo,id:e?.id||uid(),link:safeLink(f.get('link'))};if(!value.title.trim()||!value.venue.trim())throw Error('Completá nombre y lugar.');await commit(d=>{if(e)d.events=d.events.map(x=>x.id===e.id?value:x);else d.events.unshift(value)})});
+function editEvent(e){modal(e?'Detalles del evento':'Nueva fecha',photoFields(e?.photo)+field('Nombre del evento','title',e?.title||'','text','required')+colorPicker(e?.color)+field('Fecha','date',e?.date||'','date','required')+field('Horario','time',e?.time||'','time')+field('Lugar y dirección','venue',e?.venue||'','text','required')+`<label for="repertoire">Repertorio</label><select id="repertoire" name="repertoire"><option value="">Por definir</option>${data.repertoires.map(r=>`<option value="${r.id}" ${r.id===e?.repertoire?'selected':''}>${esc(r.title)}</option>`).join('')}</select>`+field('Enlace del evento (opcional)','link',e?.link||'','url')+`<label for="notes">Detalles y notas</label><textarea name="notes" id="notes">${esc(e?.notes)}</textarea>`+(e?'<button type="button" class="danger" id="delEvent">Eliminar fecha</button>':''),async f=>{const photo=await photoValue(f,e?.photo);f.delete('photoFile');f.delete('removePhoto');const value={...Object.fromEntries(f),photo,id:e?.id||uid(),link:safeLink(f.get('link')),color:safeColor(f.get('color'))};if(!value.title.trim()||!value.venue.trim())throw Error('Completá nombre y lugar.');await commit(d=>{if(e)d.events=d.events.map(x=>x.id===e.id?value:x);else d.events.unshift(value)})});
   if(e)$('#delEvent').onclick=async()=>{
     if(!confirm(`¿Eliminar la fecha «${e.title}»?`))return;
     try{await commit(d=>{d.events=d.events.filter(x=>x.id!==e.id)});$('#modal').close()}catch(err){$('#error').textContent=err.message}
@@ -59,7 +60,7 @@ function renderEquipment(c){
 function editEquipment(e){modal(e?'Editar equipamiento':'Nuevo equipamiento',photoFields(e?.photo)+field('Nombre del equipamiento','title',e?.title||'','text','required maxlength="150"')+field('Costo aproximado (Gs)','cost',e?.cost??'','number','required min="0" step="1"')+`<label for="notes">Información (opcional)</label><textarea id="notes" name="notes" placeholder="Modelo, características, dónde comprar…">${esc(e?.notes)}</textarea>`,async f=>{const title=f.get('title').trim(),cost=Number(f.get('cost'));if(!title)throw Error('Escribí el nombre del equipamiento.');if(!Number.isSafeInteger(cost)||cost<0)throw Error('Ingresá un costo válido en guaraníes.');const photo=await photoValue(f,e?.photo);const value={id:e?.id||uid(),title,cost,photo,notes:f.get('notes').trim()};await commit(d=>{if(e)d.equipment=d.equipment.map(x=>x.id===e.id?value:x);else d.equipment.push(value)})})}
 
 // Orden: ▲ ▼ modifican un borrador y se guarda todo junto con «Guardar orden».
-const orderRows=items=>items.map((it,i)=>`<div class="row orden"><span class="muted">${String(i+1).padStart(2,'0')}</span><div><h3>${esc(it.title)}</h3>${it.sub?`<small>${esc(it.sub)}</small>`:''}</div><div class="ordenbtns"><button type="button" class="chip" data-move="-1" data-id="${esc(it.id)}" aria-label="Subir ${esc(it.title)}" ${i===0?'disabled':''}>▲</button><button type="button" class="chip" data-move="1" data-id="${esc(it.id)}" aria-label="Bajar ${esc(it.title)}" ${i===items.length-1?'disabled':''}>▼</button></div></div>`).join('');
+const orderRows=items=>items.map((it,i)=>`<div class="row orden${safeColor(it.color)?' colored':''}"${safeColor(it.color)?` style="--c:${safeColor(it.color)}"`:''}><span class="muted">${String(i+1).padStart(2,'0')}</span><div><h3>${esc(it.title)}</h3>${it.sub?`<small>${esc(it.sub)}</small>`:''}</div><div class="ordenbtns"><button type="button" class="chip" data-move="-1" data-id="${esc(it.id)}" aria-label="Subir ${esc(it.title)}" ${i===0?'disabled':''}>▲</button><button type="button" class="chip" data-move="1" data-id="${esc(it.id)}" aria-label="Bajar ${esc(it.title)}" ${i===items.length-1?'disabled':''}>▼</button></div></div>`).join('');
 function renderOrder(c,title,sub,items,extra=''){
   c.innerHTML=head(title,sub,`<div class="toolbar">${extra}<button type="button" id="orderCancel">Cancelar</button><button type="button" class="primary" id="orderSave">Guardar orden</button></div>`)+`<div class="detail ordenlist">${orderRows(items)}</div>`;
   c.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{
@@ -98,11 +99,11 @@ function renderRepertorios(c){
   const r=data.repertoires.find(x=>x.id===detail);
   if(!r){
     if(ordering?.type==='reps'){
-      const items=ordering.ids.map(id=>data.repertoires.find(x=>x.id===id)).filter(Boolean).map(x=>({id:x.id,title:x.title,sub:`${songsOf(x).length} canciones`}));
+      const items=ordering.ids.map(id=>data.repertoires.find(x=>x.id===id)).filter(Boolean).map(x=>({id:x.id,title:x.title,color:x.color,sub:`${songsOf(x).length} canciones`}));
       return renderOrder(c,'Ordenar repertorios','Usá ▲ ▼ para mover cada repertorio y tocá «Guardar orden».',items);
     }
     c.innerHTML=head('Repertorios','Cada show empieza con una buena selección.',`<div class="toolbar">${data.repertoires.length>1?'<button type="button" id="order">↕ Ordenar</button>':''}<button class="primary" id="add">+ Crear repertorio</button></div>`)
-      +`<div class="grid">${data.repertoires.map(rep=>{const p=repertoireProgress(songsOf(rep));return `<button class="card repcard" data-id="${esc(rep.id)}"><span>${esc(rep.title)}<small class="repmeta">${songsOf(rep).length} canciones${p.total?` · ${p.percent}% aprendido`:''}</small></span><span>↗</span></button>`}).join('')||empty('Creá el primer repertorio de Europa.')}</div>`;
+      +`<div class="grid">${data.repertoires.map(rep=>{const p=repertoireProgress(songsOf(rep)),col=safeColor(rep.color);return `<button class="card repcard${col?' colored':''}"${col?` style="--c:${col}"`:''} data-id="${esc(rep.id)}"><span>${esc(rep.title)}<small class="repmeta">${songsOf(rep).length} canciones${p.total?` · ${p.percent}% aprendido`:''}</small></span><span>↗</span></button>`}).join('')||empty('Creá el primer repertorio de Europa.')}</div>`;
     $('#add').onclick=()=>editRep();
     if($('#order'))$('#order').onclick=()=>{ordering={type:'reps',ids:data.repertoires.map(x=>x.id)};render()};
     c.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{detail=b.dataset.id;marking=null;render()});
@@ -126,7 +127,7 @@ function renderRepertorios(c){
     ?'<div class="toolbar"><button type="button" id="unmarking" data-unmarking>← Volver a la lista</button></div>'
     :`<div class="toolbar">${songs.length>1?'<button type="button" id="order">↕ Ordenar canciones</button>':''}${songs.length?'<button type="button" id="marking" data-marking>✓ Marcar progreso</button>':''}<button class="primary" id="edit">Editar repertorio</button></div>`;
   const bottom=`${link?`<a class="playlist" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Escuchar playlist ↗</a>`:''}${marcando?'<button type="button" data-unmarking>← Volver a la lista</button>':songs.length?'<button type="button" data-marking>✓ Marcar progreso</button>':''}`;
-  c.innerHTML=`<button class="back" id="back">← Repertorios</button>${head(esc(r.title),marcando?'Tocá tu instrumento cuando ya lo tengas aprendido.':'El orden de las canciones es el orden del show.',toolbar)}<div class="detail">${learned}${rows||empty('Todavía no agregaste canciones.')}${bottom?`<div class="detailactions">${bottom}</div>`:''}</div>`;
+  c.innerHTML=`<button class="back" id="back">← Repertorios</button>${head(esc(r.title),marcando?'Tocá tu instrumento cuando ya lo tengas aprendido.':'El orden de las canciones es el orden del show.',toolbar)}<div class="detail${safeColor(r.color)?' colored':''}"${safeColor(r.color)?` style="--c:${safeColor(r.color)}"`:''}>${learned}${rows||empty('Todavía no agregaste canciones.')}${bottom?`<div class="detailactions">${bottom}</div>`:''}</div>`;
   $('#back').onclick=()=>{detail=null;ordering=null;marking=null;render()};
   if($('#edit'))$('#edit').onclick=()=>editRep(r);
   if($('#order'))$('#order').onclick=()=>{ordering={type:'songs',repId:r.id,ids:songs.map(s=>s.id)};render()};
@@ -151,6 +152,7 @@ function editRep(r){
   const imported=new Map(); // songKey → instrumentos pegados desde la lista
   modal(r?'Editar repertorio':'Nuevo repertorio',
     field('Título del repertorio','title',r?.title||'','text','required maxlength="100"')
+    +colorPicker(r?.color)
     +'<label>Canciones · título y artista (opcional)</label><div id="rows"></div><button type="button" id="songAdd">+ Agregar canción</button>'
     +(data.songs.length?`<details class="library"${r?'':' open'}><summary>Elegir de mis canciones (${data.songs.length})</summary><input type="search" id="libSearch" placeholder="Buscar por título o artista" aria-label="Buscar en mis canciones" autocomplete="off"><div id="libList" class="liblist"></div></details>`:'')
     +'<details class="paste"><summary>Pegar lista (WhatsApp)</summary><p class="muted">Pegá la lista con sus ✅ y tocá «Cargar lista». Las marcas pegadas se suman a las que ya existan, nunca desmarcan.</p><textarea id="paste" rows="8" placeholder="*MI REPERTORIO*&#10;- *Canción*&#10;Voz:✅&#10;Coros:&#10;Bajo:✅"></textarea><button type="button" id="pasteLoad">Cargar lista</button> <small id="pasteMsg"></small></details>'
@@ -175,7 +177,7 @@ function editRep(r){
           else{if(!song.artist&&row.artist)song.artist=row.artist;if(pasted)song.parts=mergeParts(song.parts,pasted)}
           return song.id;
         });
-        const value={id:r?.id||uid(),title,playlist,songIds:[...new Set(ids)]};
+        const value={id:r?.id||uid(),title,playlist,songIds:[...new Set(ids)],color:safeColor(f.get('color'))};
         if(r)d.repertoires=d.repertoires.map(x=>x.id===r.id?value:x);else d.repertoires.unshift(value); // los nuevos aparecen arriba
       });
     });

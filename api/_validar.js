@@ -1,7 +1,13 @@
 // Validación de los campos opcionales nuevos (recursos y casillas de aprendizaje), para que un dato
 // mal formado no rompa la página de todos. Devuelve un mensaje de error, o '' si está bien.
 // (El guion bajo hace que Vercel no lo publique como endpoint.)
+const COLOR = /^#[0-9a-fA-F]{6}$/;
 export function validateExtras(data) {
+  for (const list of [data.repertoires, data.events]) {
+    for (const item of list || []) {
+      if (item?.color !== undefined && !(typeof item.color === 'string' && (item.color === '' || COLOR.test(item.color)))) return 'Color inválido.';
+    }
+  }
   if (data.resources !== undefined) {
     if (!Array.isArray(data.resources) || data.resources.length > 100) return 'Recursos inválidos.';
     for (const item of data.resources) {

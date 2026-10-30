@@ -14,6 +14,7 @@ Para la versión compartida: reemplazar la capa de persistencia por un repositor
 - **Repertorios:** cada canción tiene casillas por instrumento (Voz, Coros, Guitarra 2, Guitarra 1, Bajo, Batería y los que se agreguen). Cualquiera con el enlace puede marcar «ya lo aprendí». El estado vive en la **canción**, así que si el tema está en otro repertorio conserva sus marcas.
 - **Armar repertorios:** al crear o editar se pueden elegir canciones que ya existen (con buscador por título o artista, sin importar tildes ni mayúsculas) y también escribir canciones nuevas. Los repertorios nuevos aparecen arriba.
 - **Ordenar:** *↕ Ordenar* en la lista (repertorios) y *↕ Ordenar canciones* dentro de cada repertorio, con ▲ ▼ y *Guardar orden*. El editor también tiene flechas ↑ ↓ por fila.
+- **Colores:** cada repertorio y cada fecha puede tener un color (paleta de 9 + «Sin color») que pinta su tarjeta. Se elige en el formulario de edición.
 - **Eliminar:** *Editar repertorio → Eliminar repertorio*. Las canciones y sus marcas se conservan en la biblioteca.
 - **Recursos:** enlaces de la banda (redes, Drive…) para abrir o copiar. Se agregan, editan y eliminan desde la propia pestaña.
 - **Próximas fechas:** las fechas nuevas se agregan arriba. Se pueden reordenar (*↕ Ordenar*, con ▲ ▼ o *Por fecha*) y eliminar (*Eliminar fecha* dentro de cada una).
