@@ -12,7 +12,7 @@ let busy=0;
 let data;try{data=prepare(await load())}catch(error){document.body.innerHTML='<main><h1>Europa</h1><p id=accessError></p><button onclick=location.reload()>Reintentar</button></main>';document.querySelector('#accessError').textContent=error.message;throw error}
 $('.local').textContent=shared?'● Espacio compartido':'● Demo local';
 $('footer small').textContent=shared?'Datos compartidos de Europa.':'Los datos se guardan en este navegador.';
-const tabs={repertorios:'Repertorios',fechas:'Próximas Fechas',canciones:'Canciones',ahorros:'Ahorros',recursos:'Recursos',equipamientos:'Equipamientos'};let active='repertorios',detail=null,ordering=null; // ordering: borrador del orden mientras se mueve con ▲ ▼
+const tabs={repertorios:'Repertorios',fechas:'Próximas Fechas',canciones:'Canciones',ahorros:'Ahorros',recursos:'Recursos',equipamientos:'Equipamientos'};let active='repertorios',detail=null,ordering=null,marking=null; // marking: id del repertorio en vista de marcar progreso // ordering: borrador del orden mientras se mueve con ▲ ▼
 async function commit(fn){while(marcador.ocupado())await marcador.esperar();const next=structuredClone(data);fn(next);toast('Guardando…');busy++;try{data=prepare(await save(next))}finally{busy--}render();toast('Cambios guardados')}
 function toast(t){$('#toast').textContent=t;$('#toast').style.display='block';setTimeout(()=>$('#toast').style.display='none',2800)}
 const empty=t=>`<div class="empty">${t}</div>`;
@@ -21,7 +21,7 @@ const date=d=>d?new Date(d+'T12:00:00').toLocaleDateString('es-PY',{day:'numeric
 function modal(title,html,onSave){$('#modalTitle').textContent=title;$('#fields').innerHTML=html;$('#error').textContent='';$('#form').onsubmit=async e=>{e.preventDefault();const button=e.target.querySelector('.actions .primary');button.disabled=true;try{await onSave(new FormData(e.target));$('#modal').close()}catch(err){$('#error').textContent=err.message}finally{button.disabled=false}};$('#modal').showModal()}
 $('#close').onclick=$('#cancel').onclick=()=>$('#modal').close();
 function head(title,sub,button){return `<div class="sectionhead"><div><h2>${title}</h2><p>${sub}</p></div>${button||''}</div>`}
-function render(){active=location.hash.slice(1) in tabs?location.hash.slice(1):'repertorios';$('#nav').innerHTML=Object.entries(tabs).map(([k,v])=>`<button data-tab="${k}" class="${k===active?'active':''}">${v}</button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{detail=null;ordering=null;location.hash=b.dataset.tab;render()});const c=$('#content');
+function render(){active=location.hash.slice(1) in tabs?location.hash.slice(1):'repertorios';$('#nav').innerHTML=Object.entries(tabs).map(([k,v])=>`<button data-tab="${k}" class="${k===active?'active':''}">${v}</button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{detail=null;ordering=null;marking=null;location.hash=b.dataset.tab;render()});const c=$('#content');
 if(active==='repertorios')renderRepertorios(c);
 if(active==='canciones'){c.innerHTML=head('Canciones',`${data.songs.length} canciones en la biblioteca de Europa.`)+ '<input class="search" id="search" placeholder="Buscar canción o artista" aria-label="Buscar canciones"><div id="songs"></div>';const list=()=>{const q=$('#search').value.toLowerCase();const groups={};data.songs.filter(s=>(s.title+' '+s.artist).toLowerCase().includes(q)).forEach(s=>(groups[s.artist||'Sin artista']??=[]).push(s));$('#songs').innerHTML=Object.keys(groups).sort((a,b)=>a.localeCompare(b)).map(a=>`<article class="detail" style="margin-bottom:16px"><h3>${esc(a)}</h3>${groups[a].sort((a,b)=>a.title.localeCompare(b.title)).map(s=>`<div class="row"><div>${esc(s.title)}</div><small>${data.repertoires.filter(r=>r.songIds.includes(s.id)).length} repertorio(s)</small></div>`).join('')}</article>`).join('')||empty('Las canciones que agregues a tus repertorios aparecerán acá.')};$('#search').oninput=list;list()}
 if(active==='recursos')renderResources(c);
@@ -92,24 +92,33 @@ function renderRepertorios(c){
       +`<div class="grid">${data.repertoires.map(rep=>{const p=repertoireProgress(songsOf(rep));return `<button class="card repcard" data-id="${esc(rep.id)}"><span>${esc(rep.title)}<small class="repmeta">${songsOf(rep).length} canciones${p.total?` · ${p.percent}% aprendido`:''}</small></span><span>↗</span></button>`}).join('')||empty('Creá el primer repertorio de Europa.')}</div>`;
     $('#add').onclick=()=>editRep();
     if($('#order'))$('#order').onclick=()=>{ordering={type:'reps',ids:data.repertoires.map(x=>x.id)};render()};
-    c.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{detail=b.dataset.id;render()});
+    c.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{detail=b.dataset.id;marking=null;render()});
     return;
   }
   if(ordering?.type==='songs'&&ordering.repId===r.id){
     const items=ordering.ids.map(id=>data.songs.find(x=>x.id===id)).filter(Boolean).map(s=>({id:s.id,title:s.title,sub:s.artist}));
     return renderOrder(c,esc(r.title),'Ordená las canciones con ▲ ▼ y tocá «Guardar orden». El orden es el del show.',items);
   }
-  const songs=songsOf(r),p=repertoireProgress(songs);
+  const songs=songsOf(r),p=repertoireProgress(songs),marcando=marking===r.id;
+  // El resumen (barra y avance por instrumento) se ve siempre; las casillas solo en la vista de marcar progreso.
   const learned=p.total?`<div class="learned"><div class="learnedtop"><strong>Aprendido: ${p.percent}%</strong><small>${p.done} de ${p.total} casillas</small></div><div class="bar"><div style="width:${p.percent}%"></div></div><div class="byinstrument">${p.byPart.map(x=>`<span>${esc(x.name)} ${x.done}/${x.total}</span>`).join('')}</div></div>`:'';
   const rows=songs.map((s,i)=>{
+    const num=String(i+1).padStart(2,'0');
+    if(!marcando)return `<div class="row"><span class="muted">${num}</span><div><h3>${esc(s.title)}</h3>${s.artist?`<small>${esc(s.artist)}</small>`:''}</div></div>`;
     const sp=songProgress(s);
-    return `<div class="row songitem"><span class="muted">${String(i+1).padStart(2,'0')}</span><div class="songmain"><div class="songhead"><div><h3>${esc(s.title)}</h3>${s.artist?`<small>${esc(s.artist)}</small>`:''}</div><span class="badge${sp.done===sp.total?' complete':''}">${sp.done}/${sp.total}</span></div><div class="chips">${partsOf(s).map(part=>`<button type="button" class="chip" aria-pressed="${part.done}" data-song="${esc(s.id)}" data-part="${esc(part.name)}">${part.done?'✓ ':''}${esc(part.name)}</button>`).join('')}<button type="button" class="linkbtn" data-parts="${esc(s.id)}">Editar instrumentos</button></div></div></div>`;
+    return `<div class="row songitem"><span class="muted">${num}</span><div class="songmain"><div class="songhead"><div><h3>${esc(s.title)}</h3>${s.artist?`<small>${esc(s.artist)}</small>`:''}</div><span class="badge${sp.done===sp.total?' complete':''}">${sp.done}/${sp.total}</span></div><div class="chips">${partsOf(s).map(part=>`<button type="button" class="chip" aria-pressed="${part.done}" data-song="${esc(s.id)}" data-part="${esc(part.name)}">${part.done?'✓ ':''}${esc(part.name)}</button>`).join('')}<button type="button" class="linkbtn" data-parts="${esc(s.id)}">Editar instrumentos</button></div></div></div>`;
   }).join('');
   const link=webLink(r.playlist);
-  c.innerHTML=`<button class="back" id="back">← Repertorios</button>${head(esc(r.title),'El orden de las canciones es el orden del show. Tocá tu instrumento cuando ya lo tengas aprendido.',`<div class="toolbar">${songs.length>1?'<button type="button" id="order">↕ Ordenar canciones</button>':''}<button class="primary" id="edit">Editar repertorio</button></div>`)}<div class="detail">${learned}${rows||empty('Todavía no agregaste canciones.')}${link?`<a class="playlist" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Escuchar playlist ↗</a>`:''}</div>`;
-  $('#back').onclick=()=>{detail=null;ordering=null;render()};
-  $('#edit').onclick=()=>editRep(r);
+  const toolbar=marcando
+    ?'<div class="toolbar"><button type="button" id="unmarking" data-unmarking>← Volver a la lista</button></div>'
+    :`<div class="toolbar">${songs.length>1?'<button type="button" id="order">↕ Ordenar canciones</button>':''}${songs.length?'<button type="button" id="marking" data-marking>✓ Marcar progreso</button>':''}<button class="primary" id="edit">Editar repertorio</button></div>`;
+  const bottom=`${link?`<a class="playlist" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Escuchar playlist ↗</a>`:''}${marcando?'<button type="button" data-unmarking>← Volver a la lista</button>':songs.length?'<button type="button" data-marking>✓ Marcar progreso</button>':''}`;
+  c.innerHTML=`<button class="back" id="back">← Repertorios</button>${head(esc(r.title),marcando?'Tocá tu instrumento cuando ya lo tengas aprendido.':'El orden de las canciones es el orden del show.',toolbar)}<div class="detail">${learned}${rows||empty('Todavía no agregaste canciones.')}${bottom?`<div class="detailactions">${bottom}</div>`:''}</div>`;
+  $('#back').onclick=()=>{detail=null;ordering=null;marking=null;render()};
+  if($('#edit'))$('#edit').onclick=()=>editRep(r);
   if($('#order'))$('#order').onclick=()=>{ordering={type:'songs',repId:r.id,ids:songs.map(s=>s.id)};render()};
+  c.querySelectorAll('[data-marking]').forEach(b=>b.onclick=()=>{marking=r.id;render()});
+  c.querySelectorAll('[data-unmarking]').forEach(b=>b.onclick=()=>{marking=null;render()});
   c.querySelectorAll('[data-part]').forEach(b=>b.onclick=()=>marcador.marcar(b.dataset.song,b.dataset.part,b.getAttribute('aria-pressed')!=='true'));
   c.querySelectorAll('[data-parts]').forEach(b=>b.onclick=()=>editSongParts(data.songs.find(x=>x.id===b.dataset.parts)));
 }
@@ -187,7 +196,7 @@ function editRep(r){
   }
   if(r)$('#delRep').onclick=async()=>{
     if(!confirm(`¿Eliminar el repertorio «${r.title}»?\n\nLas canciones y sus marcas no se borran: quedan en tu biblioteca para usarlas en otro repertorio.`))return;
-    try{await commit(d=>{d.repertoires=d.repertoires.filter(x=>x.id!==r.id)});$('#modal').close();detail=null;ordering=null;render()}catch(e){$('#error').textContent=e.message}
+    try{await commit(d=>{d.repertoires=d.repertoires.filter(x=>x.id!==r.id)});$('#modal').close();detail=null;ordering=null;marking=null;render()}catch(e){$('#error').textContent=e.message}
   };
   $('#pasteLoad').onclick=()=>{
     const parsed=parseLista($('#paste').value);
@@ -256,7 +265,7 @@ async function refresh(){
 }
 if(shared){setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh)}
 
-window.addEventListener('hashchange',()=>{detail=null;ordering=null;render()});render();
+window.addEventListener('hashchange',()=>{detail=null;ordering=null;marking=null;render()});render();
 
 async function hydratePhotos(){for(const img of document.querySelectorAll('img[data-photo]')){const ref=img.dataset.photo;delete img.dataset.photo;try{img.src=await resolvePhoto(ref)}catch{img.alt='Foto no disponible'}}}
 new MutationObserver(hydratePhotos).observe(document.body,{childList:true,subtree:true});hydratePhotos();

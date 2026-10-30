@@ -52,3 +52,7 @@ dialog .danger{margin-top:20px}
 .libitem button:disabled{opacity:.55;cursor:default}
 dialog .danger{color:#9a2b2b;border-color:#d9b3b3;background:#fff}
 dialog .danger:hover{background:#fbeeee}
+
+/* Vista del repertorio: acciones al pie */
+.detailactions{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px}
+.detailactions .playlist{padding:12px 0}
