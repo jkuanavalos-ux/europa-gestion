@@ -50,3 +50,16 @@ test('keepalive consulta Supabase y reporta el estado',async()=>{
   res=response();await keepalive({method:'GET',headers:{},query:{}},res);assert.equal(res.code,502);assert.match(res.body.detail,/HTTP 404/);
  }finally{globalThis.fetch=original}
 });
+test('la respuesta incluye la versión publicada (para que las páginas abiertas se actualicen)',async()=>{
+ env();const original=globalThis.fetch;
+ try{
+  globalThis.fetch=async()=>({ok:true,json:async()=>[{revision:3,data}]});
+  process.env.VERCEL_GIT_COMMIT_SHA='abc1234';
+  let res=response();await handler({method:'GET',headers:{},query:{}},res);assert.equal(res.body.version,'abc1234');
+  globalThis.fetch=async()=>({ok:true,json:async()=>[{revision:4,data}]});
+  res=response();await handler({method:'PUT',headers:{},body:{revision:3,data},query:{}},res);assert.equal(res.body.version,'abc1234');
+  delete process.env.VERCEL_GIT_COMMIT_SHA;
+  globalThis.fetch=async()=>({ok:true,json:async()=>[{revision:3,data}]});
+  res=response();await handler({method:'GET',headers:{},query:{}},res);assert.equal(res.body.version,'');
+ }finally{globalThis.fetch=original;delete process.env.VERCEL_GIT_COMMIT_SHA}
+});

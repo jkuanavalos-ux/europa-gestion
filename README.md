@@ -16,7 +16,8 @@ Para la versión compartida: reemplazar la capa de persistencia por un repositor
 - **Ordenar:** *↕ Ordenar* en la lista (repertorios) y *↕ Ordenar canciones* dentro de cada repertorio, con ▲ ▼ y *Guardar orden*. El editor también tiene flechas ↑ ↓ por fila.
 - **Colores:** cada repertorio y cada fecha puede tener un color (paleta de 9 + «Sin color») que pinta su tarjeta. Se elige en el formulario de edición.
 - **Eliminar:** *Editar repertorio → Eliminar repertorio*. Las canciones y sus marcas se conservan en la biblioteca.
-- **Recursos:** enlaces de la banda (redes, Drive…) para abrir o copiar. Se agregan, editan y eliminan desde la propia pestaña.
+- **Recursos:** enlaces de la banda (redes, Drive…) para abrir o copiar. Se agregan, editan y eliminan desde la propia pestaña. Debajo está la **Guía de presupuesto**, un texto editable (*Editar*): `## Apartado` para un título y `- Detalle: monto` para cada línea.
+- **Actualización automática:** si se publica una versión nueva de la página, las pestañas abiertas se recargan solas cuando no se está editando (el servidor informa la versión con `VERCEL_GIT_COMMIT_SHA`).
 - **Próximas fechas:** las fechas nuevas se agregan arriba. Se pueden reordenar (*↕ Ordenar*, con ▲ ▼ o *Por fecha*) y eliminar (*Eliminar fecha* dentro de cada una).
 - Las pestañas *Objetivos* y *Ahorros* se quitaron (sus datos, `goals` y `movements`, siguen guardados pero ocultos). Los datos viejos (`goals`) siguen guardados en la base, solo que ocultos.
 

@@ -71,3 +71,12 @@ dialog .danger:hover{background:#fbeeee}
 .card.colored .tag,.card.colored .date{color:color-mix(in srgb,var(--c) 75%,#282820)}
 .detail.colored{border-top:6px solid var(--c)}
 .row.orden.colored{border-left:6px solid var(--c);padding-left:12px}
+
+/* Guía de presupuesto (Recursos) */
+.guide{margin-top:34px;background:#fff;border:1px solid #e4e0d7;border-radius:14px;padding:25px}
+.guidehead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
+.guide h4{margin:24px 0 6px;font-size:15px}
+.guide ul{list-style:none;margin:0;padding:0}
+.guide li{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px solid #eeeae2}
+.guide li strong{white-space:nowrap}
+.guide p{margin:10px 0}

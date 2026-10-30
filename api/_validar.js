@@ -3,6 +3,13 @@
 // (El guion bajo hace que Vercel no lo publique como endpoint.)
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 export function validateExtras(data) {
+  if (data.guide !== undefined) {
+    const g = data.guide;
+    const ok = g && typeof g === 'object' && !Array.isArray(g)
+      && typeof g.title === 'string' && g.title.trim() && g.title.length <= 100
+      && typeof g.text === 'string' && g.text.length <= 6000;
+    if (!ok) return 'Guía inválida.';
+  }
   for (const list of [data.repertoires, data.events]) {
     for (const item of list || []) {
       if (item?.color !== undefined && !(typeof item.color === 'string' && (item.color === '' || COLOR.test(item.color)))) return 'Color inválido.';

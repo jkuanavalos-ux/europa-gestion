@@ -23,7 +23,7 @@ export default async function handler(req,res){
  try{
   if(req.method==='GET'){
    if(req.query.photo){const name=String(req.query.photo);if(!/^[a-f0-9-]+\.jpg$/.test(name))return reply(400,'Foto inválida');const r=await remote('/storage/v1/object/europa-photos/'+name);res.setHeader('Content-Type','image/jpeg');return res.status(200).send(Buffer.from(await r.arrayBuffer()))}
-   const rows=await (await remote('/rest/v1/europa_state?id=eq.1&select=revision,data')).json();if(!rows[0])return reply(503,'Ejecutá setup.sql en Supabase.');return res.status(200).json(rows[0]);
+   const rows=await (await remote('/rest/v1/europa_state?id=eq.1&select=revision,data')).json();if(!rows[0])return reply(503,'Ejecutá setup.sql en Supabase.');return res.status(200).json({...rows[0],version:process.env.VERCEL_GIT_COMMIT_SHA||''});
   }
   if(req.method!=='PUT'){res.setHeader('Allow','GET, PUT');return reply(405,'Método no permitido')}
   const body=typeof req.body==='string'?JSON.parse(req.body):req.body;
@@ -40,7 +40,7 @@ export default async function handler(req,res){
   }
   const rows=await (await remote(`/rest/v1/europa_state?id=eq.1&revision=eq.${body.revision}`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({data,revision:body.revision+1,updated_at:new Date().toISOString()})})).json();
   if(!rows.length)return reply(409,'Otra persona guardó cambios. Cerrá este formulario y recargá la página antes de volver a editar.');
-  return res.status(200).json({data:rows[0].data,revision:rows[0].revision});
+  return res.status(200).json({data:rows[0].data,revision:rows[0].revision,version:process.env.VERCEL_GIT_COMMIT_SHA||''});
  }catch(e){
   console.error('Supabase',e.status,e.detail,e.cause?.code||e.message);
   const why=e.status?`HTTP ${e.status}${e.detail?`: ${e.detail}`:''}`:String(e.cause?.code||e.message||'sin conexión').slice(0,60);

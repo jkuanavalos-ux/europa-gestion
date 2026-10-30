@@ -12,7 +12,10 @@ if(fragment.has('acceso')){sessionStorage.setItem('europa-access',fragment.get('
 let revision=0;
 const auth=()=>({'Authorization':'Bearer '+(sessionStorage.getItem('europa-access')||'')});
 async function request(options){const r=await fetch('/api/data',{...options,headers:{...auth(),'Content-Type':'application/json'},cache:'no-store'});const result=await r.json();if(!r.ok){const e=Error(result.error||'Error de conexión');e.status=r.status;throw e}return result}
-export async function load(){if(!shared)return loadLocal();const result=await request();revision=result.revision;return result.data}
+// Versión del sitio con la que se abrió la página (viene del servidor). Si cambia, hay un despliegue nuevo.
+let knownVersion='';
+export const siteChanged=result=>Boolean(result?.version&&knownVersion&&result.version!==knownVersion);
+export async function load(){if(!shared)return loadLocal();const result=await request();revision=result.revision;if(result.version&&!knownVersion)knownVersion=result.version;return result.data}
 export async function save(data){if(!shared){saveLocal(data);return data}const result=await request({method:'PUT',body:JSON.stringify({data,revision})});revision=result.revision;return result.data}
 // Para actualizar la pantalla sin pisar la revisión de un guardado en curso.
 export const currentRevision=()=>revision;

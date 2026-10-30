@@ -1,14 +1,15 @@
 import {readPhoto} from './photos.js';
-import {load,save,uid,money,safeLink,shared,resolvePhoto,peek,adopt,currentRevision} from './store.js';
+import {load,save,uid,money,safeLink,shared,resolvePhoto,peek,adopt,currentRevision,siteChanged} from './store.js';
 import {songKey,normalize,partsOf,findSong,mergeParts,editParts,songProgress,repertoireProgress} from './canciones.js';
 import {crearMarcador} from './marcas.js';
 import {moveId,applyOrder} from './orden.js';
 import {safeColor,colorPicker} from './colores.js';
+import {DEFAULT_GUIDE,GUIDE_LIMITS,renderGuide} from './guia.js';
 import {parseLista} from './importar.js';
 import {KINDS,ICONS,DEFAULT_RESOURCES,webLink,normalizeUrl,shortUrl} from './recursos.js';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // Los recursos por defecto se muestran hasta que alguien guarde la lista (desde ahí viven en la base de datos).
-const prepare=d=>{d.resources??=structuredClone(DEFAULT_RESOURCES);return d};
+const prepare=d=>{d.resources??=structuredClone(DEFAULT_RESOURCES);d.guide??=structuredClone(DEFAULT_GUIDE);return d};
 let busy=0;
 let data;try{data=prepare(await load())}catch(error){document.body.innerHTML='<main><h1>Europa</h1><p id=accessError></p><button onclick=location.reload()>Reintentar</button></main>';document.querySelector('#accessError').textContent=error.message;throw error}
 $('.local').textContent=shared?'● Espacio compartido':'● Demo local';
@@ -238,12 +239,25 @@ function editRep(r){
 function renderResources(c){
   c.innerHTML=head('Recursos','Enlaces de la banda: abrilos o copialos para compartir.','<button class="primary" id="add">+ Agregar recurso</button>')
     +`<div class="grid">${data.resources.map(res=>{const url=webLink(res.url);return `<article class="card resource"><span class="tag">${esc(KINDS[res.kind]||'Enlace')}</span><h3>${ICONS[res.kind]||ICONS.otro} ${esc(res.title)}</h3><small class="url">${esc(shortUrl(url))}</small><div class="resactions">${url?`<a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir ↗</a><button type="button" data-copy="${esc(res.id)}">Copiar enlace</button>`:''}<button type="button" data-edit="${esc(res.id)}">Editar</button></div></article>`}).join('')||empty('Agregá los enlaces de la banda: redes, drive, carpetas…')}</div>`;
+  c.insertAdjacentHTML('beforeend',`<section class="guide"><div class="guidehead"><h2>${esc(data.guide.title)}</h2><button type="button" id="editGuide">Editar</button></div><div class="guidebody">${renderGuide(data.guide.text,esc)}</div></section>`);
+  $('#editGuide').onclick=()=>editGuide();
   $('#add').onclick=()=>editResource();
   c.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editResource(data.resources.find(x=>x.id===b.dataset.edit)));
   c.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{
     const res=data.resources.find(x=>x.id===b.dataset.copy);
     toast(await copyText(webLink(res?.url))?'Enlace copiado':'No se pudo copiar. Abrí el recurso y copialo desde la barra.');
   });
+}
+function editGuide(){
+  modal('Editar guía',
+    field('Título','title',data.guide.title,'text',`required maxlength="${GUIDE_LIMITS.title}"`)
+    +`<label for="guideText">Texto</label><textarea id="guideText" name="text" rows="16" maxlength="${GUIDE_LIMITS.text}">${esc(data.guide.text)}</textarea>`
+    +'<small>Usá «## Apartado» para un título, «- Detalle: monto» para cada línea (el monto se resalta) y texto suelto para notas.</small>',
+    async f=>{
+      const title=f.get('title').trim(),text=f.get('text').trim();
+      if(!title)throw Error('Escribí un título.');
+      await commit(d=>{d.guide={title,text}});
+    });
 }
 async function copyText(text){
   if(!text)return false;
@@ -276,7 +290,14 @@ const marcador=crearMarcador({getData:()=>data,setData:d=>{data=d},load:async()=
 async function refresh(){
   const editing=()=>busy||ordering||marcador.ocupado()||$('#modal').open||/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||'');
   if(!shared||document.hidden||editing())return;
-  try{const res=await peek();if(!res||editing()||res.revision<=currentRevision())return;adopt(res.revision);data=prepare(res.data);render()}catch{/* se reintenta en la próxima */}
+  try{
+    const res=await peek();
+    if(!res||editing())return;
+    // Hay una versión nueva de la página publicada: se recarga para no quedar con código viejo.
+    if(siteChanged(res)){toast('Hay una versión nueva. Actualizando…');setTimeout(()=>{if(!editing())location.reload()},1200);return}
+    if(res.revision<=currentRevision())return;
+    adopt(res.revision);data=prepare(res.data);render();
+  }catch{/* se reintenta en la próxima */}
 }
 if(shared){setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh)}
 
