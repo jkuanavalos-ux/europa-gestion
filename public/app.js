@@ -19,6 +19,7 @@ async function commit(fn){while(marcador.ocupado())await marcador.esperar();cons
 function toast(t){$('#toast').textContent=t;$('#toast').style.display='block';setTimeout(()=>$('#toast').style.display='none',2800)}
 const empty=t=>`<div class="empty">${t}</div>`;
 const field=(label,name,value='',type='text',extra='')=>`<label for="${name}">${label}</label><input id="${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}>`;
+const dateChip=d=>d?`<span class="datechip"><b>${new Date(d+'T12:00:00').getDate()}</b><i>${new Date(d+'T12:00:00').toLocaleDateString('es-PY',{month:'short'}).replace('.','')}</i></span>`:'';
 const date=d=>d?new Date(d+'T12:00:00').toLocaleDateString('es-PY',{day:'numeric',month:'long',year:'numeric'}):'';
 function modal(title,html,onSave){$('#modalTitle').textContent=title;$('#fields').innerHTML=html;$('#error').textContent='';$('#form').onsubmit=async e=>{e.preventDefault();const button=e.target.querySelector('.actions .primary');button.disabled=true;try{await onSave(new FormData(e.target));$('#modal').close()}catch(err){$('#error').textContent=err.message}finally{button.disabled=false}};$('#modal').showModal()}
 $('#close').onclick=$('#cancel').onclick=()=>$('#modal').close();
@@ -40,7 +41,7 @@ function renderEvents(c){
   }
   const today=new Date().toLocaleDateString('en-CA');
   c.innerHTML=head('Próximas Fechas','La agenda de la banda, siempre a mano.',`<div class="toolbar">${data.events.length>1?'<button type="button" id="order">↕ Ordenar</button>':''}<button class="primary" id="add">+ Agregar fecha</button></div>`)
-    +`<div class="grid">${data.events.map(e=>{const col=safeColor(e.color);return `<button class="card${col?' colored':''}"${col?` style="--c:${col}"`:''} data-id="${esc(e.id)}">${photoMarkup(e.photo,e.title)}<span class="date">${date(e.date)} · ${esc(e.time)}</span><h3>${esc(e.title)}</h3><small>${esc(e.venue)}${e.date<today?' · Finalizado':''}</small></button>`}).join('')||empty('La próxima fecha empieza acá. Agregá un concierto.')}</div>`;
+    +`<div class="grid">${data.events.map(e=>{const col=safeColor(e.color);return `<button class="card${col?' colored':''}"${col?` style="--c:${col}"`:''} data-id="${esc(e.id)}">${photoMarkup(e.photo,e.title)}<span class="datehead">${dateChip(e.date)}<span class="date">${date(e.date)} · ${esc(e.time)}</span></span><h3>${esc(e.title)}</h3><small>${esc(e.venue)}${e.date<today?' · Finalizado':''}</small></button>`}).join('')||empty('La próxima fecha empieza acá. Agregá un concierto.')}</div>`;
   $('#add').onclick=()=>editEvent();
   if($('#order'))$('#order').onclick=()=>{ordering={type:'events',ids:data.events.map(e=>e.id)};render()};
   c.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>editEvent(data.events.find(e=>e.id===b.dataset.id)));
@@ -116,7 +117,7 @@ function renderRepertorios(c){
   }
   const songs=songsOf(r),p=repertoireProgress(songs),marcando=marking===r.id;
   // El resumen (barra y avance por instrumento) se ve siempre; las casillas solo en la vista de marcar progreso.
-  const learned=p.total?`<div class="learned"><div class="learnedtop"><strong>Aprendido: ${p.percent}%</strong><small>${p.done} de ${p.total} casillas</small></div><div class="bar"><div style="width:${p.percent}%"></div></div><div class="byinstrument">${p.byPart.map(x=>`<span>${esc(x.name)} ${x.done}/${x.total}</span>`).join('')}</div></div>`:'';
+  const learned=p.total?`<div class="learned"><div class="learnedtop"><strong>Aprendido: ${p.percent}%</strong><small>${p.done} de ${p.total} casillas</small></div><div class="bar"><div style="width:${p.percent}%"></div></div><div class="byinstrument">${p.byPart.map(x=>`<span style="--p:${x.total?Math.round(x.done*100/x.total):0}%">${esc(x.name)} ${x.done}/${x.total}</span>`).join('')}</div></div>`:'';
   const rows=songs.map((s,i)=>{
     const num=String(i+1).padStart(2,'0');
     if(!marcando)return `<div class="row"><span class="muted">${num}</span><div><h3>${esc(s.title)}</h3>${s.artist?`<small>${esc(s.artist)}</small>`:''}</div></div>`;
